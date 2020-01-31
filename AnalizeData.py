@@ -9,27 +9,29 @@ from io_project.read_utils import *
 import re
 import numpy as np
 from multiprocessing import Pool
-from constants_proj.AI_proj_params import AnalizeDataParams, ParallelParams
-from config.MainConfig import get_analize_data_config, get_paralallel_config
+from constants_proj.AI_proj_params import PreprocParams, ParallelParams
+from config.MainConfig import get_analize_data_config, get_parallel_config
+from preproc.UtilsDates import get_day_of_year_from_month_and_day
+from sklearn.metrics import mean_squared_error
 
 # Not sure how to move this inside the function
-config_par = get_paralallel_config()
+config_par = get_parallel_config()
 NUM_PROC = config_par[ParallelParams.NUM_PROC]
 
 def parallel_proc(proc_id):
     # /data/COAPS_nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES
     config = get_analize_data_config()
-    input_folder_tsis = config[AnalizeDataParams.input_folder_tsis]
-    input_folder_forecast = config[AnalizeDataParams.input_folder_forecast]
-    input_folder_obs = config[AnalizeDataParams.input_folder_obs]
-    output_folder = config[AnalizeDataParams.output_folder]
-    PIES = config[AnalizeDataParams.PIES]
-    YEARS = config[AnalizeDataParams.YEARS]
-    MONTHS = config[AnalizeDataParams.MONTHS]
-    fields = config[AnalizeDataParams.fields_names]
-    fields_obs = config[AnalizeDataParams.fields_names_obs]
-    plot_modes = config[AnalizeDataParams.plot_modes_per_field]
-    layers = config[AnalizeDataParams.layers_to_plot]
+    input_folder_tsis = config[PreprocParams.input_folder_tsis]
+    input_folder_forecast = config[PreprocParams.input_folder_forecast]
+    input_folder_obs = config[PreprocParams.input_folder_obs]
+    output_folder = config[PreprocParams.output_folder]
+    PIES = config[PreprocParams.PIES]
+    YEARS = config[PreprocParams.YEARS]
+    MONTHS = config[PreprocParams.MONTHS]
+    fields = config[PreprocParams.fields_names]
+    fields_obs = config[PreprocParams.fields_names_obs]
+    plot_modes = config[PreprocParams.plot_modes_per_field]
+    layers = config[PreprocParams.layers_to_plot]
 
     img_viz = EOAImageVisualizer(output_folder=output_folder, disp_images=False)
 
@@ -37,12 +39,15 @@ def parallel_proc(proc_id):
     for c_using_pie in PIES:
         for c_year in YEARS:
             for c_month in MONTHS:
-                days_of_month, days_of_year = get_days_from_month(c_month)
-                # Rads all the files for this month
-                da_files, da_paths = get_da_file_name(input_folder_tsis, c_year, c_month, c_using_pie)
-                forecast_files, forecast_paths = get_forecast_file_name(input_folder_forecast, c_year,
-                                                                                    c_month, c_using_pie)
-                obs_files, obs_paths = get_obs_file_names(input_folder_obs, c_year, c_month, c_using_pie)
+                try:
+                    days_of_month, days_of_year = get_days_from_month(c_month)
+                    # Rads all the files for this month
+                    da_files, da_paths = get_da_file_name(input_folder_tsis, c_year, c_month, c_using_pie)
+                    forecast_files, forecast_paths = get_forecast_file_name(input_folder_forecast, c_year,
+                                                                                        c_month, c_using_pie)
+                    obs_files, obs_paths = get_obs_file_names(input_folder_obs, c_year, c_month, c_using_pie)
+                except Exception as e:
+                    print(F"Failed to find all files for date {c_year}-{c_month}")
 
                 # This for is fixed to be able to run in parallel
                 for c_day_of_month, c_day_of_year in enumerate(days_of_year):
@@ -95,6 +100,43 @@ def parallel_proc(proc_id):
                                                     title=title, file_name_prefix=F'{c_field_name}_{c_year}_{c_month:02d}_{c_day_of_month:02d}', z_lavels_names=layers,
                                                     flip_data=True, plot_mode=plot_modes[idx_field])
 
+def testing():
+    import matplotlib.pyplot as plt
+    import math
+
+    # Computing the MSE between the 'free run and the DA surn
+    input_folder = '/data/HYCOM/DA_HYCOM_TSIS/preproc'
+    years = [2009, 2010, 2011]
+    months = range(1,13)
+    day_month = 2
+    fields = ['srfhgt']
+    for year in years:
+        for month in months:
+            for field in fields:
+                try:
+                    day_of_year = get_day_of_year_from_month_and_day(month, day_of_month=day_month, year=year)
+                    freerun_file = F'/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/forecast/PIES/{year}{month:02d}/archv.{year}_{day_of_year:03d}_00.a'
+                    da_file = F'/data/COAPS_Net/gleam/dmitry/hycom/TSIS/IASx0.03/output/{year}_PIES/archv.{year}_{day_of_year}_00.a'
+
+                    freerun_data = read_hycom_output(freerun_file, fields, [0])
+                    da_data = read_hycom_output(da_file, fields, [0])
+                    not_nan_idx = np.logical_not(np.isnan(np.array(freerun_data[field][0])))
+
+                    fig, axs = plt.subplots(1, 3, squeeze=True, figsize=(16 * 3, 16))
+                    axs[0].imshow(freerun_data[field][0])
+                    axs[0].set_title(F"Freerun {field}", fontdict={'fontsize': 80})
+                    axs[1].imshow(da_data[field][0])
+                    axs[1].set_title(F"DA {field}", fontdict={'fontsize': 80})
+                    axs[2].imshow(freerun_data[field][0] - da_data[field][0])
+                    axs[2].set_title(
+                        F"Difference MSE ~{mean_squared_error(np.array(da_data[field][0])[not_nan_idx], np.array(freerun_data[field][0])[not_nan_idx]):0.4f}",
+                        fontdict={'fontsize': 80})
+                    fig.suptitle(F"{year}_{month}_{field}", fontsize=80)
+                    plt.show()
+                except Exception as e:
+                    print(F"Failed for {year}_{month}_{field}: {e}")
+                    continue
+
 
 def main():
     # ----------- Parallel -------
@@ -103,7 +145,9 @@ def main():
 
     # ----------- Sequencial -------
     NUM_PROC = 1
-    parallel_proc(1)
+    # parallel_proc(1)
+    testing()
+
 
 if __name__ == '__main__':
     main()

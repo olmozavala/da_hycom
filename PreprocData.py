@@ -6,19 +6,20 @@ from img_viz.constants import PlotMode
 from preproc.UtilsDates import get_days_from_month
 from preproc.metrics import mse
 from io_project.read_utils import *
+import xarray as xr
 import re
 import numpy as np
 from multiprocessing import Pool
 from constants_proj.AI_proj_params import PreprocParams, ParallelParams
-from config.MainConfig import get_analize_data_config, get_parallel_config
+from config.PreprocConfig import get_preproc_config, get_paralallel_config
 
 # Not sure how to move this inside the function
-config_par = get_parallel_config()
+config_par = get_paralallel_config()
 NUM_PROC = config_par[ParallelParams.NUM_PROC]
 
 def parallel_proc(proc_id):
     # /data/COAPS_nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES
-    config = get_analize_data_config()
+    config = get_preproc_config()
     input_folder_tsis = config[PreprocParams.input_folder_tsis]
     input_folder_obs = config[PreprocParams.input_folder_obs]
     output_folder = config[PreprocParams.output_folder]
@@ -26,13 +27,9 @@ def parallel_proc(proc_id):
     YEARS = config[PreprocParams.YEARS]
     MONTHS = config[PreprocParams.MONTHS]
     fields = config[PreprocParams.fields_names]
-    fields_obs = config[PreprocParams.fields_names_obs]
+    obs_fields = config[PreprocParams.fields_names_obs]
     layers = config[PreprocParams.layers_to_plot]
-
-    max_values = {field: 0 for field in fields}
-    min_values = {field: 10**5 for field in fields}
-    max_values_obs = {field: 0 for field in fields_obs}
-    min_values_obs = {field: 10**5 for field in fields_obs}
+    img_viz = EOAImageVisualizer(output_folder=output_folder, disp_images=False)
 
     # These are the data assimilated files
     for c_using_pie in PIES:
@@ -51,47 +48,47 @@ def parallel_proc(proc_id):
 
                         try:
                             da_file_idx = [i for i, file in enumerate(da_files) if re.search(re_hycom, file) != None][0]
-                            obs_file_idx = [i for i, file in enumerate(obs_files) if re.search(re_obs, file) != None][0]
+                            obs_file_idx = [i for i, file in enumerate(obs_files)
+                                            if re.search(re_obs, file) != None][0]
+
                         except Exception as e:
                             print(F"ERROR: The file for date {c_year} - {c_month} - {c_day_of_month} doesn't exist: {e}")
                             continue
 
                         print(F" =============== Working with: {da_files[da_file_idx]} ============= ")
-                        print(F"Available fields: {read_field_names(da_paths[da_file_idx])}")
-                        # da_np_fields = read_hycom_output(da_paths[da_file_idx], fields, layers=layers)
-                        #
-                        # for idx_field, c_field_name in enumerate(fields):
-                        #     da_np_c_field = da_np_fields[c_field_name]
-                        #     c_max = np.nanmax(da_np_c_field)
-                        #     c_min = np.nanmin(da_np_c_field)
-                        #     if c_max >= max_values[c_field_name]:
-                        #         max_values[c_field_name] = c_max
-                        #     if c_min <= min_values[c_field_name]:
-                        #         min_values[c_field_name] = c_min
+                        da_np_fields = read_hycom_output(da_paths[da_file_idx], fields, layers=layers)
 
-                        obs_np_fields = read_netcdf(obs_paths[obs_file_idx], fields_obs, layers=[0], rename_fields=fields)
+                        # --------- Preprocessing HYCOM-TSIS data -------------
+                        for id_field, c_field in enumerate(fields):
+                            rows = da_np_fields[c_field].shape[1]
+                            cols = da_np_fields[c_field].shape[2]
+                            df_var = {c_field: (("lat", "lon"), da_np_fields[c_field][0])}
 
-                        for idx_field, c_field_name in enumerate(fields):
-                            obs_np_c_field = obs_np_fields[c_field_name]
-                            c_max = np.nanmax(obs_np_c_field)
-                            c_min = np.nanmin(obs_np_c_field)
-                            if c_max >= max_values_obs[c_field_name]:
-                                max_values_obs[c_field_name] = c_max
-                            if c_min <= min_values_obs[c_field_name]:
-                                min_values_obs[c_field_name] = c_min
+                            if id_field == 0:
+                                preproc_da_ds = xr.Dataset(df_var, {"lat": np.arange(rows), "lon": np.arange(cols)})
+                            else:
+                                temp = xr.Dataset(df_var, {"lat": np.arange(rows), "lon": np.arange(cols)})
+                                preproc_da_ds = preproc_da_ds.merge(temp)
+                        preproc_da_ds.to_netcdf(join(output_folder, F"hycom-tsis_{c_year}_{c_day_of_year:03d}.nc"))
 
-                        print(F"Current max: {max_values_obs}")
-                        print(F"Current min: {min_values_obs}")
-
-    print(F"Current max: {max_values}")
-    print(F"Current min: {min_values}")
+                        # --------- Preprocessing observed data -------------
+                        obs_ds = xr.load_dataset(obs_paths[obs_file_idx])
+                        for id_field, c_obs_field in enumerate(obs_fields):
+                            if id_field == 0:
+                                preproc_obs_ds = obs_ds[c_obs_field].to_dataset()
+                            else:
+                                preproc_obs_ds = preproc_obs_ds.merge(obs_ds[c_obs_field].to_dataset())
+                        preproc_obs_ds.to_netcdf(join(output_folder, F"obs_{c_year}_{c_day_of_year:03d}.nc"))
 
 
 def main():
-    # p = Pool(NUM_PROC)
-    # p.map(parallel_proc, range(NUM_PROC))
-    # ---------- Sequencial -------------
-    parallel_proc(1)
+    # ----------- Parallel -------
+    p = Pool(NUM_PROC)
+    p.map(parallel_proc, range(NUM_PROC))
+
+    # ----------- Sequencial -------
+    # NUM_PROC = 1
+    # parallel_proc(1)
 
 if __name__ == '__main__':
     main()

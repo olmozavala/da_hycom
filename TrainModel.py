@@ -1,7 +1,8 @@
 from datetime import datetime
 
 from config.MainConfig import get_training_3d
-from AI.data_generation.Generators2D import data_gen_hycomtsis
+# from AI.data_generation.Generators2D import data_gen_hycomtsis
+from AI.data_generation.GeneratorPreproc import data_gen_from_preproc
 
 from constants_proj.AI_proj_params import ProjTrainingParams, ParallelParams
 import trainingutils as utilsNN
@@ -10,6 +11,8 @@ from models.modelSelector import select_2d_model
 from img_viz.common import create_folder
 from io_project.read_utils import get_da_tot_days
 from os.path import join
+import numpy as np
+import os
 from constants.AI_params import TrainingParams, ModelParams
 
 from tensorflow.keras.utils import plot_model
@@ -19,12 +22,14 @@ if __name__ == '__main__':
     config = get_training_3d()
 
     input_folder = config[ProjTrainingParams.input_folder_tsis]
-    input_folder_obs = config[ProjTrainingParams.input_folder_obs]
+    input_folder_preproc = config[ProjTrainingParams.input_folder_preproc]
+    # input_folder_obs = config[ProjTrainingParams.input_folder_obs]
     years = config[ProjTrainingParams.YEARS]
     pies = config[ProjTrainingParams.PIES]
     fields = config[ProjTrainingParams.fields_names]
     fields_obs = config[ProjTrainingParams.fields_names_obs]
     output_field = config[ProjTrainingParams.output_field_name]
+    day_to_predict = config[ProjTrainingParams.prediction_time]
 
     output_folder = config[TrainingParams.output_folder]
     val_perc = config[TrainingParams.validation_percentage]
@@ -67,7 +72,7 @@ if __name__ == '__main__':
 
     # ******************* Selecting the model **********************
     model = select_2d_model(config)
-    plot_model(model, to_file=join(output_folder,F'{model_name}.png'))
+    plot_model(model, to_file=join(output_folder,F'{model_name}.png'), show_shapes=True)
 
     print("Saving split information...")
     file_name_splits = join(split_info_folder, F'{model_name}.txt')
@@ -85,11 +90,25 @@ if __name__ == '__main__':
                                                                        logs_folder=logs_folder)
 
     print("Training ...")
-    generator_train = data_gen_hycomtsis(paths_to_read[train_ids], files_to_read[train_ids],
-                                   input_folder_obs, fields, fields_obs, output_field)
+    # generator_train = data_gen_hycomtsis(paths_to_read[train_ids], files_to_read[train_ids],
+    #                                input_folder_obs, fields, fields_obs, output_field)
+    #
+    # generator_val = data_gen_hycomtsis(paths_to_read[val_ids], files_to_read[val_ids],
+    #                                      input_folder_obs, fields, fields_obs, output_field)
 
-    generator_val = data_gen_hycomtsis(paths_to_read[val_ids], files_to_read[val_ids],
-                                         input_folder_obs, fields, fields_obs, output_field)
+    # ----------- Using preprocessed data -------------------
+    all_files = os.listdir(input_folder_preproc)
+    obs_files = np.array([x for x in all_files if x.startswith('obs')])
+    da_files = np.array([x for x in all_files if x.startswith('hycom')])
+
+    train_ids = train_ids[train_ids < 1088]
+    val_ids = val_ids[val_ids < 1088]
+
+    generator_train = data_gen_from_preproc(input_folder_preproc, obs_files, da_files[train_ids],
+                                            fields, fields_obs, output_field, days_separation=day_to_predict)
+
+    generator_val = data_gen_from_preproc(input_folder_preproc, obs_files, da_files[val_ids],
+                                            fields, fields_obs, output_field, days_separation=day_to_predict)
 
     # Decide which generator to use
     batch_size = config[TrainingParams.batch_size]
