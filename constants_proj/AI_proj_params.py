@@ -1,18 +1,21 @@
 from enum import Enum
 
-MAX_DA = {'temp': 40, 'srfhgt': 20, 'salin': 70, 'u-vel.': 4, 'v-vel.': 4}
-MIN_DA = {'temp': 0, 'srfhgt': -20, 'salin': 0, 'u-vel.': -4, 'v-vel.': -4}
+MAX_MODEL = {'temp': 35, 'srfhgt': 10, 'salin': 40, 'u-vel.': 3, 'v-vel.': 3, 'LAT': 90 , 'LON': 180}
+MIN_MODEL = {'temp': 10, 'srfhgt': -10, 'salin': 0, 'u-vel.':-3, 'v-vel.':-3, 'LAT':-90 , 'LON':-180}
 
 MAX_OBS = {'sst': 40, 'ssh': 0.9, 'sss': 40}
-MIN_OBS = {'sst': 0,  'ssh':-0.9, 'sss': 15}
+MIN_OBS = {'sst': 0,  'ssh':-0.9, 'sss': 0}
+
+MAX_INCREMENT = {'temp': 5, 'srfhgt': 10, 'salin': 1, 'u-vel.': 0.06, 'v-vel.': 0.06, 'LAT': 90, 'LON': 180 }
+MIN_INCREMENT = {'temp':-5, 'srfhgt':-10, 'salin':-1, 'u-vel.':-0.06, 'v-vel.':-0.06, 'LAT':-90, 'LON':-180 }
 
 
 class PreprocParams(Enum):
     input_folder_tsis = 1  # Input folder where the DA output is
-    input_folder_forecast = 2  # Input folder where the free forecast output is
+    input_folder_hycom = 2  # Input folder where the free forecast output is
     input_folder_obs = 3  # Input folder where the observations output is
     output_folder = 4  # Where to output the data
-    PIES = 5  # array of options to include PIES or not
+    imgs_output_folder = 40  # Where to output the imgs
     YEARS = 6  # Array with the years to be analyzed
     MONTHS = 7  # Array with the months to be analyzed
     fields_names = 8  # Array with the names of the fields to be analyzed
@@ -26,9 +29,6 @@ class ParallelParams(Enum):
 
 
 class ProjTrainingParams(Enum):
-    input_folder_tsis = 1  # Input folder where the DA output is
-    input_folder_forecast = 2  # Input folder where the free forecast output is
-    input_folder_obs = 3  # Input folder where the observations output is
     input_folder_preproc = 20
     output_folder = 4  # Where to output the data
     PIES = 5  # array of options to include PIES or not
@@ -36,8 +36,10 @@ class ProjTrainingParams(Enum):
     MONTHS = 7  # Array with the months to be analyzed
     fields_names = 8  # Array with the names of the fields to be analyzed
     fields_names_obs = 9   # Array with the names of the fields in the observation data to be analyzed
-    output_field_name = 10  # String containing the name of the output field
+    output_fields = 10  # String containing the name of the output field
     prediction_time = 11  # Number of days to make the prediction for
+    rows = 12 # The number of rows we will tak from the whole images for training and everything
+    cols = 13 # The number of columns we will tak from the whole images for training and everything
 
 class PredictionParams(Enum):
     input_folder = 1  # Where the images are stored

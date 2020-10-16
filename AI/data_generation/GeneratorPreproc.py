@@ -1,11 +1,14 @@
 import numpy as np
 from inout.io_netcdf import read_netcdf
+from io_project.read_utils import generateXandY, get_date_from_preproc_filename
 from os.path import join, exists
-from constants_proj.AI_proj_params import MAX_DA, MAX_OBS, MIN_OBS, MIN_DA
+from constants_proj.AI_proj_params import MAX_MODEL, MAX_OBS, MIN_OBS, MIN_MODEL, MAX_INCREMENT, MIN_INCREMENT
+import os
+from constants_proj.AI_proj_params import ProjTrainingParams
+from constants.AI_params import TrainingParams
+from img_viz.eoa_viz import EOAImageVisualizer
 
-
-def data_gen_from_preproc(path, obs_files, da_files, field_names, obs_field_names, output_field,
-                          days_separation=1, z_layers=[0]):
+def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_field_names, output_fields, z_layers=[0]):
     """
     This generator should generate X and Y for a CNN
     :param path:
@@ -13,84 +16,187 @@ def data_gen_from_preproc(path, obs_files, da_files, field_names, obs_field_name
     :return:
     """
     ex_id = -1
-    ids = np.arange(len(da_files))
     np.random.shuffle(ids)
+    batch_size = config[TrainingParams.batch_size]
+
+    all_files = os.listdir(input_folder_preproc)
+    obs_files = np.array([join(input_folder_preproc, x) for x in all_files if x.startswith('obs')])
+    increment_files = np.array([join(input_folder_preproc, x) for x in all_files if x.startswith('increment')])
+    model_files = np.array([join(input_folder_preproc, x) for x in all_files if x.startswith('model')])
+    obs_files.sort()
+    increment_files.sort()
+    model_files.sort()
+
+    rows = config[ProjTrainingParams.rows]
+    cols = config[ProjTrainingParams.cols]
 
     while True:
         # These lines are for sequential selection
-        if ex_id < (len(ids) - 1):
-            ex_id += 1
+        if ex_id < (len(ids) - batch_size):
+            ex_id += batch_size
         else:
             ex_id = 0
             np.random.shuffle(ids) # We shuffle the folders every time we have tested all the examples
 
+        c_id = ids[ex_id]
         try:
-            # Find current and next date
-            year = int(da_files[ex_id].split('_')[1])
-            day_of_year = int(da_files[ex_id].split('_')[2].split('.')[0])
+            output_file_name = increment_files[c_id]
+            obs_file_name = obs_files[c_id]
+            model_file_name = model_files[c_id]
 
-            next_day_file_name = F'hycom-tsis_{year}_{day_of_year+days_separation:03d}.nc'
+            # Needs to validate that all the files are from the same date
+            model_file_year, model_file_day = get_date_from_preproc_filename(model_file_name)
+            obs_file_year, obs_file_day = get_date_from_preproc_filename(obs_file_name)
+            output_file_year, output_file_day = get_date_from_preproc_filename(output_file_name)
 
-            da_file_name = join(path, da_files[ex_id])
-            obs_file_name = join(path, [x for x in obs_files if(str(x).endswith(da_file_name[-10:]))][0])
-            output_file_name = join(path, next_day_file_name)
+            if (model_file_day != obs_file_day) or (model_file_day != output_file_day) or\
+                    (model_file_year != obs_file_year) or (model_file_year != output_file_year):
+               print(F"The year and day do not correspond between the files: {output_file_name}, {model_file_name}, {obs_file_name}")
+               exit()
 
-            # If the 'next day' file doesn't exist, jump to the next example
+            # If any file doesn't exist, jump to the next example
             if not(exists(output_file_name)):
                 print(F"File doesn't exist: {output_file_name}")
                 continue
 
             # *********************** Reading files **************************
-            input_fields_da = read_netcdf(da_file_name, field_names, z_layers)
             input_fields_obs = read_netcdf(obs_file_name, obs_field_names, z_layers)
-            output_field_da = read_netcdf(output_file_name, [output_field], z_layers)
+            input_fields_model = read_netcdf(model_file_name, field_names, z_layers)
+            output_field_increment = read_netcdf(output_file_name, output_fields, z_layers)
 
-            # ******************* Normalizing and Cropping Data *******************
-            # TODO hardcoded dimensions and cropping code
-            # dims = input_fields_da[field_names[0]].shape
-            rows = 888
-            cols = 1400
-            num_fields = len(field_names) + len(obs_field_names)
+            succ_attempts = 0
+            while succ_attempts < batch_size:
+                start_row = np.random.randint(0, 891 - rows)  # These hardcoded numbers come from the specific size of these files
+                start_col = np.random.randint(0, 1401 - cols)
 
-            data_cube = np.zeros((rows, cols, num_fields))
-            y_data = np.zeros((rows, cols))
+                try:
+                    input_data, y_data = generateXandY(input_fields_model, input_fields_obs, output_field_increment, field_names, obs_field_names, output_fields,
+                      start_row, start_col, rows, cols)
 
-            id_field = 0
-            for c_field in field_names:
-                data_cube[:, :, id_field] = (input_fields_da[c_field][:rows, :cols] - MIN_DA[c_field])/MAX_DA[c_field]
-                id_field += 1
+                except Exception as e:
+                    # print(F"Failed for {model_file_name} row:{start_row} col:{start_col}: {e}")
+                    continue
 
-            for c_field in obs_field_names:
-                data_cube[:, :, id_field] = (input_fields_obs[c_field][:rows, :cols] - MIN_OBS[c_field])/MAX_OBS[c_field]
-                id_field += 1
+                succ_attempts += 1
 
+                # Only use slices that have data (lesion inside)
+                X = np.expand_dims(input_data, axis=0)
+                Y = np.expand_dims(y_data, axis=0)
 
-            # ******************* Replacing nan values *********
-            y_data[:,:] = (output_field_da[output_field][:rows, :cols] - MIN_DA[output_field])/MAX_DA[output_field]
+                # We set a value of 0.5 on the land. Trying a new loss function that do not takes into account land
+                X = np.nan_to_num(X, nan=0)
+                Y = np.nan_to_num(Y, nan=-0.5)
 
-            # Only use slices that have data (lesion inside)
-            X = np.expand_dims(data_cube, axis=0)
-            Y = np.expand_dims(np.expand_dims(y_data, axis=2), axis=0)
+                # --------------- Just for debugging Plotting input and output---------------------------
+                # import matplotlib.pyplot as plt
+                # import pylab
+                # mincbar = np.nanmin(input_data)
+                # maxcbar = np.nanmax(input_data)
 
-            # We set a value of 0.5 on the land. Trying a new loss function that do not takes into account land
-            X = np.nan_to_num(X, nan=-0.5)
-            Y = np.nan_to_num(Y, nan=-0.5)
+                # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
+                # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False)
 
-            # --------------- Just for debugging ---------------------------
-            # import matplotlib.pyplot as plt
-            # plt.subplots(2, num_fields, squeeze=True, figsize=(16*num_fields, 16))
-            # for c_field in range(num_fields):
-            #     ax = plt.subplot(2, num_fields, c_field+1)
-            #     ax.imshow(X[0,:,:,c_field])
-            #
-            # # T
-            # ax = plt.subplot(2, num_fields, num_fields+1)
-            # ax.imshow(Y[0, :, :, 0])
-            # plt.show()
-            #
-            # plt.imshow(Y[0, :, :, 0]-X[0,:,:,0])
-            # plt.show()
+                # viz_obj.plot_2d_data_np_raw(np.concatenate((input_data.swapaxes(0,2), y_data.swapaxes(0,2))),
+                # viz_obj.plot_2d_data_np_raw(np.concatenate((X[0,:,:,:].swapaxes(0,2), Y[0,:,:,:].swapaxes(0,2))),
+                #                             var_names=[F"in_model_{x}" for x in field_names] +
+                #                                       [F"in_obs_{x}" for x in obs_field_names]+
+                #                                       [F"out_inc_{x}" for x in output_fields],
+                #                             rot_90=True,
+                #                             file_name=F"{model_file_year}_{model_file_day}_{start_col}_{start_row}",
+                #                             title=F"Input data: {field_names} and {obs_field_names}, output {output_fields}")
 
-            yield X, Y
+                yield X, Y
         except Exception as e:
-            print("----- Not able to generate for: ", 1, " ERROR: ", str(e))
+            print(F"----- Not able to generate for file number (from batch):  {succ_attempts} ERROR: ", str(e))
+
+# def data_gen_from_preproc_3d(input_folder_preproc,  config, ids, field_names, obs_field_names, output_fields, z_layers=[0]):
+#     """
+#     This generator should generate X and Y for a CNN
+#     :param path:
+#     :param file_names:
+#     :return:
+#     """
+#     ex_id = -1
+#     np.random.shuffle(ids)
+#     batch_size = config[TrainingParams.batch_size]
+#
+#     all_files = os.listdir(input_folder_preproc)
+#     obs_files = np.array([join(input_folder_preproc, x) for x in all_files if x.startswith('obs')])
+#     increment_files = np.array([join(input_folder_preproc, x) for x in all_files if x.startswith('increment')])
+#     model_files = np.array([join(input_folder_preproc, x) for x in all_files if x.startswith('model')])
+#
+#     rows = config[ProjTrainingParams.rows]
+#     cols = config[ProjTrainingParams.cols]
+#
+#     while True:
+#         # These lines are for sequential selection
+#         if ex_id < (len(ids) - batch_size):
+#             ex_id += batch_size
+#         else:
+#             ex_id = 0
+#             np.random.shuffle(ids) # We shuffle the folders every time we have tested all the examples
+#
+#         c_id = ids[ex_id]
+#         try:
+#             # Find current and next date
+#             # output_file_name = increment_files[c_id]
+#             output_file_name = increment_files[c_id]
+#             obs_file_name = obs_files[c_id]
+#             model_file_name = model_files[c_id]
+#
+#             # If the 'next day' file doesn't exist, jump to the next example
+#             if not(exists(output_file_name)):
+#                 print(F"File doesn't exist: {output_file_name}")
+#                 continue
+#
+#             # *********************** Reading files **************************
+#             input_fields_obs = read_netcdf(obs_file_name, obs_field_names, z_layers)
+#             input_fields_model = read_netcdf(model_file_name, field_names, z_layers)
+#             output_field_increment = read_netcdf(output_file_name, output_fields, z_layers)
+#
+#             # ******************* Normalizing and Cropping Data *******************
+#             # dims = input_fields_da[field_names[0]].shape
+#
+#             succ_attempts = 0
+#             while succ_attempts < batch_size:
+#                 start_row = np.random.randint(0, 891 - rows)  # These hardcoded numbers come from the specific size of these files
+#                 start_col = np.random.randint(0, 1401 - cols)
+#
+#                 try:
+#                     input_data, y_data = generateXandY(input_fields_model, input_fields_obs, output_field_increment, field_names, obs_field_names, output_fields,
+#                                                        start_row, start_col, rows, cols)
+#
+#                 except Exception as e:
+#                     # print(F"Failed for {model_file_name} row:{start_row} col:{start_col}")
+#                     continue
+#
+#                 succ_attempts += 1
+#
+#                 # Only use slices that have data (lesion inside)
+#                 X = np.expand_dims(np.expand_dims(input_data, axis=2), axis=0)
+#                 Y = np.expand_dims(np.expand_dims(y_data, axis=2), axis=0)
+#
+#                 # We set a value of 0.5 on the land. Trying a new loss function that do not takes into account land
+#                 # X = np.nan_to_num(X, nan=-0.5)
+#                 # Y = np.nan_to_num(Y, nan=-0.5)
+#
+#                 # --------------- Just for debugging Plotting input and output---------------------------
+#                 # import matplotlib.pyplot as plt
+#                 # import pylab
+#                 # mincbar = np.nanmin(input_data)
+#                 # maxcbar = np.nanmax(input_data)
+#                 # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
+#                 # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False)
+#                 # viz_obj.plot_2d_data_np_raw(np.concatenate((input_data.swapaxes(0,2), y_data.swapaxes(0,2))),
+#                 # # viz_obj.plot_2d_data_np_raw(np.concatenate((X[0,:,:,:].swapaxes(0,2), Y[0,:,:,:].swapaxes(0,2))),
+#                 #                             var_names=[F"in_model_{x}" for x in field_names] +
+#                 #                                       [F"in_obs_{x}" for x in obs_field_names]+
+#                 #                                       [F"out_inc_{x}" for x in output_fields],
+#                 #                             file_name=F"both_{c_id}",
+#                 #                             title=F"Input data: {field_names} and {obs_field_names}, output {output_fields}")
+#
+#                 yield X, Y
+#         except Exception as e:
+#             print(F"----- Not able to generate for file number (from batch):  {succ_attempts} ERROR: ", str(e))
+#
+# #

@@ -9,83 +9,92 @@ from io_project.read_utils import *
 import re
 import numpy as np
 from multiprocessing import Pool
-from constants_proj.AI_proj_params import PreprocParams, ParallelParams
-from config.MainConfig import get_analize_data_config, get_parallel_config
+from constants_proj.AI_proj_params import PreprocParams, ParallelParams, ProjTrainingParams
+from config.MainConfig import get_training_2d
 
 # Not sure how to move this inside the function
-config_par = get_parallel_config()
-NUM_PROC = config_par[ParallelParams.NUM_PROC]
+NUM_PROC = 10
 
 def parallel_proc(proc_id):
     # /data/COAPS_nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES
-    config = get_analize_data_config()
-    input_folder_tsis = config[PreprocParams.input_folder_tsis]
-    input_folder_obs = config[PreprocParams.input_folder_obs]
-    output_folder = config[PreprocParams.output_folder]
-    PIES = config[PreprocParams.PIES]
-    YEARS = config[PreprocParams.YEARS]
-    MONTHS = config[PreprocParams.MONTHS]
-    fields = config[PreprocParams.fields_names]
-    fields_obs = config[PreprocParams.fields_names_obs]
-    layers = config[PreprocParams.layers_to_plot]
+    config = get_training_2d()
+    input_folder = config[ProjTrainingParams.input_folder_preproc]
+    fields = config[ProjTrainingParams.fields_names]
+    fields_obs = config[ProjTrainingParams.fields_names_obs]
 
-    max_values = {field: 0 for field in fields}
-    min_values = {field: 10**5 for field in fields}
+    max_values_model = {field: 0 for field in fields}
+    min_values_model = {field: 10**5 for field in fields}
     max_values_obs = {field: 0 for field in fields_obs}
     min_values_obs = {field: 10**5 for field in fields_obs}
+    max_values_inc = {field: 0 for field in fields}
+    min_values_inc = {field: 10**5 for field in fields}
 
     # These are the data assimilated files
-    for c_using_pie in PIES:
-        for c_year in YEARS:
-            for c_month in MONTHS:
-                days_of_month, days_of_year = get_days_from_month(c_month)
-                # Rads all the files for this month
-                da_files, da_paths = get_da_file_name(input_folder_tsis, c_year, c_month, c_using_pie)
-                obs_files, obs_paths = get_obs_file_names(input_folder_obs, c_year, c_month, c_using_pie)
+    all_files = os.listdir(input_folder)
+    all_files.sort()
+    model_files = np.array([x for x in all_files if x.startswith('model')])
 
-                # This for is fixed to be able to run in parallel
-                for c_day_of_month, c_day_of_year in enumerate(days_of_year):
-                    if (c_day_of_month % NUM_PROC) == proc_id:
-                        re_hycom = F'archv.{c_year}_{c_day_of_year:03d}\S*.a'
-                        re_obs = F'tsis_obs_ias_{c_year}{c_month:02d}{c_day_of_month+1:02d}\S*.nc'
+    for id_file, c_file in enumerate(model_files[0:2]):
+        print(F"Working with {c_file}")
+        # Find current and next date
+        year = int(c_file.split('_')[1])
+        day_of_year = int(c_file.split('_')[2].split('.')[0])
 
-                        try:
-                            da_file_idx = [i for i, file in enumerate(da_files) if re.search(re_hycom, file) != None][0]
-                            obs_file_idx = [i for i, file in enumerate(obs_files) if re.search(re_obs, file) != None][0]
-                        except Exception as e:
-                            print(F"ERROR: The file for date {c_year} - {c_month} - {c_day_of_month} doesn't exist: {e}")
-                            continue
+        model_file = join(input_folder, F'model_{year}_{day_of_year:03d}.nc')
+        inc_file = join(input_folder,F'increment_{year}_{day_of_year:03d}.nc')
+        obs_file = join(input_folder,F'obs_{year}_{day_of_year:03d}.nc')
 
-                        print(F" =============== Working with: {da_files[da_file_idx]} ============= ")
-                        print(F"Available fields: {read_field_names(da_paths[da_file_idx])}")
-                        # da_np_fields = read_hycom_output(da_paths[da_file_idx], fields, layers=layers)
-                        #
-                        # for idx_field, c_field_name in enumerate(fields):
-                        #     da_np_c_field = da_np_fields[c_field_name]
-                        #     c_max = np.nanmax(da_np_c_field)
-                        #     c_min = np.nanmin(da_np_c_field)
-                        #     if c_max >= max_values[c_field_name]:
-                        #         max_values[c_field_name] = c_max
-                        #     if c_min <= min_values[c_field_name]:
-                        #         min_values[c_field_name] = c_min
+        # *********************** Reading files **************************
+        z_layers = [0]
+        input_fields_model = read_netcdf(model_file, fields, z_layers)
+        input_fields_obs = read_netcdf(obs_file, fields_obs, z_layers)
+        output_field_increment = read_netcdf(inc_file, fields, z_layers)
 
-                        obs_np_fields = read_netcdf(obs_paths[obs_file_idx], fields_obs, layers=[0], rename_fields=fields)
+        # =============== Computing max values for the model
+        for idx_field, c_field_name in enumerate(fields):
+            da_np_c_field = input_fields_model[c_field_name]
+            c_max = np.nanmax(da_np_c_field)
+            c_min = np.nanmin(da_np_c_field)
+            if c_max >= max_values_model[c_field_name]:
+                max_values_model[c_field_name] = c_max
+            if c_min <= min_values_model[c_field_name]:
+                min_values_model[c_field_name] = c_min
+        # print(F"Cur max for model: {max_values_model}")
+        # print(F"Cur max for model: {min_values_model}")
 
-                        for idx_field, c_field_name in enumerate(fields):
-                            obs_np_c_field = obs_np_fields[c_field_name]
-                            c_max = np.nanmax(obs_np_c_field)
-                            c_min = np.nanmin(obs_np_c_field)
-                            if c_max >= max_values_obs[c_field_name]:
-                                max_values_obs[c_field_name] = c_max
-                            if c_min <= min_values_obs[c_field_name]:
-                                min_values_obs[c_field_name] = c_min
+        # =============== Computing max values for the observations
+        for idx_field, c_field_name in enumerate(fields_obs):
+            da_np_c_field = input_fields_obs[c_field_name]
+            c_max = np.nanmax(da_np_c_field)
+            c_min = np.nanmin(da_np_c_field)
+            if c_max >= max_values_obs[c_field_name]:
+                max_values_obs[c_field_name] = c_max
+            if c_min <= min_values_obs[c_field_name]:
+                min_values_obs[c_field_name] = c_min
+        # print(F"Cur max for obs: {max_values_obs}")
+        # print(F"Cur min for obs: {min_values_obs}")
 
-                        print(F"Current max: {max_values_obs}")
-                        print(F"Current min: {min_values_obs}")
+        # =============== Computing max values for the increment
+        for idx_field, c_field_name in enumerate(fields):
+            da_np_c_field = output_field_increment[c_field_name]
+            c_max = np.nanmax(da_np_c_field)
+            c_min = np.nanmin(da_np_c_field)
+            if c_max >= max_values_inc[c_field_name]:
+                max_values_inc[c_field_name] = c_max
+            if c_min <= min_values_inc[c_field_name]:
+                min_values_inc[c_field_name] = c_min
+        # print(F"Cur max for inc: {max_values_inc}")
+        # print(F"Cur min for inc: {min_values_inc}")
 
-    print(F"Current max: {max_values}")
-    print(F"Current min: {min_values}")
-
+    print("----------------- Model --------------------")
+    for c_field_name in fields:
+        print(F"{c_field_name} min: {min_values_model[c_field_name]:0.2f} max: {max_values_model[c_field_name]:0.2f}")
+    print("----------------- Observations --------------------")
+    for c_field_name in fields_obs:
+        print(F"{c_field_name} min: {min_values_obs[c_field_name]:0.2f} max: {max_values_obs[c_field_name]:0.2f}")
+    print("----------------- Increment --------------------")
+    for c_field_name in fields:
+        print(F"{c_field_name} min: {min_values_inc[c_field_name]:0.2f} max: {max_values_inc[c_field_name]:0.2f}")
 
 def main():
     # p = Pool(NUM_PROC)
