@@ -29,12 +29,24 @@ def parallel_proc(proc_id):
     max_values_inc = {field: 0 for field in fields}
     min_values_inc = {field: 10**5 for field in fields}
 
+    mean_values_model = {field: 0 for field in fields}
+    mean_values_obs = {field: 0 for field in fields_obs}
+    mean_values_inc = {field: 0 for field in fields}
+
+    var_values_model = {field: 0 for field in fields}
+    var_values_obs = {field: 0 for field in fields_obs}
+    var_values_inc = {field: 0 for field in fields}
+
     # These are the data assimilated files
     all_files = os.listdir(input_folder)
     all_files.sort()
     model_files = np.array([x for x in all_files if x.startswith('model')])
+    model_files.sort()
 
-    for id_file, c_file in enumerate(model_files[0:2]):
+    # model_files = model_files[55:58]
+    tot_files = len(model_files)
+
+    for id_file, c_file in enumerate(model_files):
         print(F"Working with {c_file}")
         # Find current and next date
         year = int(c_file.split('_')[1])
@@ -53,6 +65,8 @@ def parallel_proc(proc_id):
         # =============== Computing max values for the model
         for idx_field, c_field_name in enumerate(fields):
             da_np_c_field = input_fields_model[c_field_name]
+            # Computing mean also
+            mean_values_model[c_field_name] += np.nanmean(da_np_c_field) / tot_files
             c_max = np.nanmax(da_np_c_field)
             c_min = np.nanmin(da_np_c_field)
             if c_max >= max_values_model[c_field_name]:
@@ -65,6 +79,13 @@ def parallel_proc(proc_id):
         # =============== Computing max values for the observations
         for idx_field, c_field_name in enumerate(fields_obs):
             da_np_c_field = input_fields_obs[c_field_name]
+            # We needed to add this try because in some cases there are none observations, like in day 245
+            try:
+                mean_values_obs[c_field_name] += np.nanmean(da_np_c_field) / tot_files
+            except Exception as e:
+                mean_values_obs[c_field_name] += 0
+            print(F' {c_file}:{c_field_name}: {mean_values_obs[c_field_name]}')
+
             c_max = np.nanmax(da_np_c_field)
             c_min = np.nanmin(da_np_c_field)
             if c_max >= max_values_obs[c_field_name]:
@@ -77,6 +98,8 @@ def parallel_proc(proc_id):
         # =============== Computing max values for the increment
         for idx_field, c_field_name in enumerate(fields):
             da_np_c_field = output_field_increment[c_field_name]
+            # Computing mean also
+            mean_values_inc[c_field_name] += np.nanmean(da_np_c_field) / tot_files
             c_max = np.nanmax(da_np_c_field)
             c_min = np.nanmin(da_np_c_field)
             if c_max >= max_values_inc[c_field_name]:
@@ -86,15 +109,71 @@ def parallel_proc(proc_id):
         # print(F"Cur max for inc: {max_values_inc}")
         # print(F"Cur min for inc: {min_values_inc}")
 
+    # Computing STD
+    print("=============================== Computing Variance....")
+    for id_file, c_file in enumerate(model_files):
+        print(F"Working with {c_file}")
+        # Find current and next date
+        year = int(c_file.split('_')[1])
+        day_of_year = int(c_file.split('_')[2].split('.')[0])
+
+        model_file = join(input_folder, F'model_{year}_{day_of_year:03d}.nc')
+        inc_file = join(input_folder,F'increment_{year}_{day_of_year:03d}.nc')
+        obs_file = join(input_folder,F'obs_{year}_{day_of_year:03d}.nc')
+
+        # *********************** Reading files **************************
+        z_layers = [0]
+        input_fields_model = read_netcdf(model_file, fields, z_layers)
+        input_fields_obs = read_netcdf(obs_file, fields_obs, z_layers)
+        output_field_increment = read_netcdf(inc_file, fields, z_layers)
+
+        # =============== Computing max values for the model
+        for idx_field, c_field_name in enumerate(fields):
+            da_np_c_field = input_fields_model[c_field_name]
+            var_values_model[c_field_name] += np.nanmean( (da_np_c_field - mean_values_model[c_field_name])**2 ) / tot_files
+
+        # =============== Computing max values for the observations
+        for idx_field, c_field_name in enumerate(fields_obs):
+            da_np_c_field = input_fields_obs[c_field_name]
+            data = (da_np_c_field[:].filled(np.nan) - mean_values_obs[c_field_name])**2
+            if (np.logical_not(np.isnan(data)).any()):
+                var_values_obs[c_field_name] += np.nanmean(data) / tot_files
+            # print(F' {c_file}:{c_field_name}: {var_values_obs[c_field_name]}')
+
+        # =============== Computing max values for the increment
+        for idx_field, c_field_name in enumerate(fields):
+            da_np_c_field = output_field_increment[c_field_name]
+            var_values_inc[c_field_name] += np.nanmean( (da_np_c_field - mean_values_inc[c_field_name])**2 ) / tot_files
+
     print("----------------- Model --------------------")
+    f = open("MIN_MAX_MEAN_STD.csv", 'w')
+    text = F"TYPE,Field,MIN,MAX,MEAN,VARIANCE,STD\n"
+    f.write(text)
+
     for c_field_name in fields:
-        print(F"{c_field_name} min: {min_values_model[c_field_name]:0.2f} max: {max_values_model[c_field_name]:0.2f}")
+        text = F"MODEL,{c_field_name},  {min_values_model[c_field_name]:0.6f},  {max_values_model[c_field_name]:0.6f}, " \
+               F" {mean_values_model[c_field_name]:0.6f}, {var_values_model[c_field_name]: 0.6f}, {np.sqrt(var_values_model[c_field_name]): 0.6f}\n"
+        f.write(text)
+        print(text)
+
     print("----------------- Observations --------------------")
     for c_field_name in fields_obs:
-        print(F"{c_field_name} min: {min_values_obs[c_field_name]:0.2f} max: {max_values_obs[c_field_name]:0.2f}")
+        text = F"OBS,{c_field_name},  {min_values_obs[c_field_name]:0.6f},  {max_values_obs[c_field_name]:0.6f}, " \
+            F" {mean_values_obs[c_field_name]:0.6f}, {var_values_obs[c_field_name]: 0.6f}, {np.sqrt(var_values_obs[c_field_name]): 0.6f}\n"
+        f.write(text)
+        print(text)
+
     print("----------------- Increment --------------------")
     for c_field_name in fields:
-        print(F"{c_field_name} min: {min_values_inc[c_field_name]:0.2f} max: {max_values_inc[c_field_name]:0.2f}")
+        text = F"INC,{c_field_name},  {min_values_inc[c_field_name]:0.6f},  {max_values_inc[c_field_name]:0.6f}," \
+        F" {mean_values_inc[c_field_name]:0.6f}, {var_values_inc[c_field_name]: 0.6f}, {np.sqrt(var_values_inc[c_field_name]): 0.6f}\n"
+        f.write(text)
+        print(text)
+
+    f.close()
+
+
+
 
 def main():
     # p = Pool(NUM_PROC)

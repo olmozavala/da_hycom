@@ -1,5 +1,5 @@
 import os
-from io_project.read_utils import generateXandY
+from io_project.read_utils import generateXandY, normalizeData
 
 from numpy.distutils.system_info import flame_info
 from tensorflow.keras.utils import plot_model
@@ -11,7 +11,7 @@ import pandas as pd
 
 from img_viz.eoa_viz import EOAImageVisualizer
 from config.MainConfig import get_prediction_params
-from constants_proj.AI_proj_params import PredictionParams, ProjTrainingParams
+from constants_proj.AI_proj_params import PredictionParams, ProjTrainingParams, PreprocParams
 from constants.AI_params import TrainingParams
 from models.modelSelector import select_2d_model
 from models_proj.models import simpleCNN
@@ -20,7 +20,6 @@ from img_viz.constants import PlotMode
 from sklearn.metrics import mean_squared_error
 
 import matplotlib.pyplot as plt
-
 
 def main():
     config = get_prediction_params()
@@ -37,13 +36,14 @@ def test_model(config):
     rows = config[ProjTrainingParams.rows]
     cols = config[ProjTrainingParams.cols]
     run_name = config[TrainingParams.config_name]
+    norm_type = config[ProjTrainingParams.norm_type]
 
     output_imgs_folder = join(output_imgs_folder, run_name)
 
     # *********** Chooses the proper model ***********
     print('Reading model ....')
-    # model = select_2d_model(config, last_activation='relu')
-    model = simpleCNN(config)
+    model = select_2d_model(config, last_activation='relu')
+    # model = simpleCNN(config)
     plot_model(model, to_file=join(output_folder, F'running.png'), show_shapes=True)
 
     # *********** Reads the weights***********
@@ -71,13 +71,14 @@ def test_model(config):
         output_field_increment = read_netcdf(inc_file, output_fields, z_layers)
 
         # ******************* Normalizing and Cropping Data *******************
-        # for start_row in np.arange(0, 891-rows, rows):
-        #     for start_col in np.arange(0, 1401-cols, cols):
-        for start_row in np.arange(0, 891-rows, 200):
-            for start_col in np.arange(0, 1401-cols, 100):
+        for start_row in np.arange(0, 891-rows, rows):
+            for start_col in np.arange(0, 1401-cols, cols):
+        # for start_row in np.arange(0, 891-rows, 200):
+        #     for start_col in np.arange(0, 1401-cols, 100):
+                # Generate the proper inputs for the NN
                 try:
                     input_data, y_data = generateXandY(input_fields_model, input_fields_obs, output_field_increment, field_names, obs_field_names, output_fields,
-                                                       start_row, start_col, rows, cols)
+                                                       start_row, start_col, rows, cols, norm_type=norm_type)
                 except Exception as e:
                     print(F"Failed for {c_file} row:{start_row} col:{start_col}")
                     continue
@@ -90,83 +91,108 @@ def test_model(config):
                 X = np.nan_to_num(X, nan=0)
                 Y = np.nan_to_num(Y, nan=-0.5)
 
-                output_nn_all_norm = model.predict(X, verbose=1)
+                # Make the prediction of the network
+                output_nn_original = model.predict(X, verbose=1)
+
+                # Make nan all values inside the land
                 land_indexes = Y == -0.5
-                ocean_indexes = np.logical_not(land_indexes)
-                output_nn_all_norm[land_indexes] = np.nan
-                final_output_cnn = np.squeeze(output_nn_all_norm)
-                if len(final_output_cnn.shape) == 2: # In this case we only had one output and we need to make it 'array' to plot
-                    final_output_cnn = np.expand_dims(final_output_cnn, axis=2)
+                output_nn_original[land_indexes] = np.nan
 
-                mse_cnn = np.sqrt(mean_squared_error(output_nn_all_norm[ocean_indexes], Y[ocean_indexes]))
-                #
-                # errors_df.iloc[id_file] = [mse_pers, mse_cnn, mse_cnn_pers]
-                # # ================== Making plots ==========
-                # titles = [F"$TSIS^{{t}}$",
-                #           F"$TSIS^{{t+{day_to_predict}}}$",
-                #           F"$CNN^{{t+{day_to_predict}}}$"]
-                #
-                # fields = [persistence_preproc[0, :, :, 0],
-                #           Y[0, :, :, 0],
-                #           output_nn_all_norm[0, :, :, 0]]
-                #
+                # Denormalize the data to the proper units in each field
+                denorm_cnn_output = np.zeros(output_nn_original.shape)
+                denorm_y = np.zeros(Y.shape)
+                for field_idx, c_field in enumerate(output_fields):
+                    denorm_cnn_output[:, :, :, field_idx] = normalizeData(output_nn_original[:, :, :, field_idx], c_field, data_type = PreprocParams.type_inc, norm_type= norm_type, normalize=False)
+                    denorm_y[:, :, :, field_idx] = normalizeData(Y[:, :, :, field_idx], c_field, data_type = PreprocParams.type_inc, norm_type= norm_type, normalize=False)
+                # Recover the original land areas, they are lost after denormalization
+                denorm_y[land_indexes] = np.nan
 
-                b_size = 6 # Boundary size we don't want to take into account
+                # Remove the 'extra dimension'
+                denorm_cnn_output = np.squeeze(denorm_cnn_output)
+                denorm_y = np.squeeze(denorm_y)
+                if len(denorm_cnn_output.shape) == 2: # In this case we only had one output and we need to make it 'array' to plot
+                    denorm_cnn_output = np.expand_dims(denorm_cnn_output, axis=2)
+                    denorm_y = np.expand_dims(denorm_y, axis=2)
+
+                # Compute RMSE
+                rmse_cnn = np.zeros(len(output_fields))
+                for i in range(len(output_fields)):
+                    ocean_indexes = np.logical_not(np.isnan(denorm_y[:,:,i]))
+                    rmse_cnn[i] = np.sqrt(mean_squared_error(denorm_cnn_output[:,:,i][ocean_indexes], denorm_y[:,:,i][ocean_indexes]))
 
                 # viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
                 viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False)
+
                 # ================== This displays all inputs and the cnn output ================
-                viz_obj.plot_2d_data_np_raw(np.concatenate((input_data.swapaxes(0,2), y_data.swapaxes(0,2))),
                 # viz_obj.plot_2d_data_np_raw(np.concatenate((X[0,:,:,:].swapaxes(0,2), Y[0,:,:,:].swapaxes(0,2))),
+                viz_obj.plot_2d_data_np_raw(np.concatenate((input_data.swapaxes(0,2), denorm_y.swapaxes(0,2), denorm_cnn_output.swapaxes(0,2))),
                                             var_names=[F"in_model_{x}" for x in field_names] +
                                                       [F"in_obs_{x}" for x in obs_field_names] +
-                                                      [F"out_inc_{x}" for x in output_fields],
+                                                      [F"out_inc_{x}" for x in output_fields] +
+                                                      [F"cnn_{x}" for x in output_fields],
                                             file_name=F"Input_and_CNN_{c_file}_{start_row:03d}_{start_col:03d}",
                                             rot_90=True,
-                                            title=F"Input data: {field_names} and {obs_field_names}, output {output_fields}")
+                                            cols_per_row=len(field_names),
+                                            title=F"Input data: {field_names} and obs {obs_field_names}, increment {output_fields}, cnn {output_fields}")
 
-                # ================== Displays desired output ================
-                viz_obj.output_folder = join(output_imgs_folder,'expected')
-                viz_obj.plot_2d_data_np_raw(y_data.swapaxes(0,2)[:, b_size:-b_size, b_size:-b_size],
-                                            var_names= [F"out_inc_{x}" for x in output_fields],
-                                            file_name=F"Expected_output_{c_file}_{start_row:03d}_{start_col:03d}",
+                # =========== Making the same color bar for desired output and the NN =====================
+                mincbar = [np.nanmin(denorm_y[:, :, x]) for x in range(denorm_cnn_output.shape[-1])]
+                maxcbar = [np.nanmax(denorm_y[:, :, x]) for x in range(denorm_cnn_output.shape[-1])]
+                error = (denorm_y - denorm_cnn_output).swapaxes(0,2)
+                mincbarerror = [np.nanmin(error[i,:,:]) for i in range(len(output_fields))]
+                maxcbarerror = [np.nanmax(error[i,:,:]) for i in range(len(output_fields))]
+                viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
+                                             mincbar=mincbar + mincbar + mincbarerror,
+                                             maxcbar=maxcbar + maxcbar + maxcbarerror)
+
+                # ================== Displays desired output ALL TOGETHER ================
+                viz_obj.output_folder = join(output_imgs_folder,'JoinedErrrorCNN')
+                viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_cnn_output.swapaxes(0,2), denorm_y.swapaxes(0,2), error), axis=0),
+                                             var_names=[F"CNN {x}" for x in output_fields] + [F"TSIS INC {x}" for x in output_fields] + [F'RMSE {c_rmse_cnn:0.4f}' for c_rmse_cnn in rmse_cnn],
+                                            file_name=F"AllError_{c_file}_{start_row:03d}_{start_col:03d}",
                                             rot_90=True,
-                                            title=F"Expected {output_fields}")
+                                            cols_per_row=len(output_fields),
+                                            title=F"{output_fields} RMSE: {np.mean(rmse_cnn):0.5f}")
 
-                # ================== Displays only CNN output ================
-                viz_obj.output_folder = join(output_imgs_folder,'cnn')
-                viz_obj.plot_2d_data_np_raw(final_output_cnn.swapaxes(0,2)[:, b_size:-b_size, b_size:-b_size],
-                                            var_names= [F"out_inc_{x}" for x in output_fields],
-                                            file_name=F"Only_CNN_{c_file}_{start_row:03d}_{start_col:03d}",
-                                            rot_90=True,
-                                            title=F"Output {output_fields}")
-
-                # ================== Displays CNN error ================
-                viz_obj.output_folder = join(output_imgs_folder,'error')
-                viz_obj.plot_2d_data_np_raw((y_data - final_output_cnn).swapaxes(0,2)[:, b_size:-b_size, b_size:-b_size],
-                                            var_names= [F"out_inc_{x}" for x in output_fields],
-                                            file_name=F"ERROR_CNN_{c_file}_{start_row:03d}_{start_col:03d}",
-                                            rot_90=True,
-                                            title=F"RMSE {output_fields}  {mse_cnn}")
-
-                # titles = [F"PERSISTENCE \n $TSIS^{{t+{day_to_predict}}} - TSIS^{{t}} $ MSE ~{mse_pers:0.4f}",
-                #           F"CNN \n $TSIS^{{t+{day_to_predict}}} - CNN^{{t+{day_to_predict}}}$ MSE ~{mse_cnn:0.4f}",
-                #           F"$TSIS^{{t}} - CNN^{{t+{day_to_predict}}}$ MSE ~{mse_cnn_pers:0.4f}"]
+                # ====================================================================
+                # ================= Individual figures for error, cnn and expected ================
+                # ====================================================================
                 #
-                # fields = [Y[0, :, :, 0] - persistence_preproc[0, :, :, 0],
-                #           Y[0, :, :, 0] - output_nn_all_norm[0, :, :, 0],
-                #           persistence_preproc[0, :, :, 0] - output_nn_all_norm[0, :, :, 0]]
+                # # ================== Displays CNN error ================
+                # viz_obj.output_folder = join(output_imgs_folder,'error')
+                # viz_obj.plot_2d_data_np_raw((denorm_y - denorm_cnn_output).swapaxes(0,2),
+                #                             var_names= [F"out_inc_{x}" for x in output_fields],
+                #                             file_name=F"ERROR_CNN_{c_file}_{start_row:03d}_{start_col:03d}",
+                #                             rot_90=True,
+                #                             title=F"RMSE {output_fields}  {np.mean(rmse_cnn):0.5f}")
                 #
-                # viz_obj.mincbar = -0.5
-                # viz_obj.maxcbar = 0.5
-                # viz_obj.plot_2d_data_np(fields, var_names=titles, title=F'{output_fields} {year}_{day_of_year:03d}',
-                #                         file_name_prefix=F'{year}_error_{day_of_year:03d}', plot_mode=PlotMode.RASTER,
-                #                        flip_data=True)
+                # # =========== Making the same color bar for desired output and the NN =====================
+                # # mincbar = [min(np.nanmin(denorm_y[:, :, x]), np.nanmin(denorm_cnn_output[:, :, x])) for x in range(denorm_cnn_output.shape[-1])]
+                # # maxcbar = [max(np.nanmax(denorm_y[:, :, x]), np.nanmax(denorm_cnn_output[:, :, x])) for x in range(denorm_cnn_output.shape[-1])]
+                # mincbar = [np.nanmin(denorm_y[:, :, x]) for x in range(denorm_cnn_output.shape[-1])]
+                # maxcbar = [np.nanmax(denorm_y[:, :, x]) for x in range(denorm_cnn_output.shape[-1])]
+                # viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
+                #
+                # # ================== Displays desired output ================
+                # viz_obj.output_folder = join(output_imgs_folder,'expected')
+                # viz_obj.plot_2d_data_np_raw(denorm_y.swapaxes(0,2),
+                #                             var_names=[F"out_inc_{x}" for x in output_fields],
+                #                             file_name=F"Expected_output_{c_file}_{start_row:03d}_{start_col:03d}",
+                #                             rot_90=True,
+                #                             title=F"Expected {output_fields}")
+                #
+                # # ================== Displays only CNN output ================
+                # viz_obj.output_folder = join(output_imgs_folder,'cnn')
+                # viz_obj.plot_2d_data_np_raw(denorm_cnn_output.swapaxes(0,2),
+                #                             var_names= [F"out_inc_{x}" for x in output_fields],
+                #                             file_name=F"Only_CNN_{c_file}_{start_row:03d}_{start_col:03d}",
+                #                             rot_90=True,
+                #                             title=F"CNN {output_fields}")
 
 
-                # if (id_file % 20 == 0):
-                #     errors_df.plot(title='CNN Comparison')
-                #     plt.show()
 
 if __name__ == '__main__':
     main()
+
+##
+

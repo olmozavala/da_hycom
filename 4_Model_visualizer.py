@@ -4,7 +4,8 @@ from io_project.read_utils import generateXandY
 from constants.AI_params import *
 from config.MainConfig import get_prediction_params
 from models.modelSelector import select_2d_model
-from models.model_viz import print_layer_names, plot_cnn_filters_by_layer, plot_intermediate_2dcnn_feature_map
+from models.model_viz import print_layer_names, plot_intermediate_2dcnn_feature_map, plot_cnn_filters_by_layer
+from constants.AI_params import TrainingParams
 from constants_proj.AI_proj_params import PredictionParams, ProjTrainingParams
 import matplotlib.image as mpltimage
 from inout.io_netcdf import read_netcdf
@@ -24,11 +25,13 @@ if __name__ == '__main__':
     field_names = config[ProjTrainingParams.fields_names]
     obs_field_names = config[ProjTrainingParams.fields_names_obs]
     output_fields = config[ProjTrainingParams.output_fields]
-    output_folder = config[PredictionParams.output_imgs_folder]
+    run_name = config[TrainingParams.config_name]
+    output_folder = join(config[PredictionParams.output_imgs_folder], 'MODEL_VISUALIZATION', run_name)
+    norm_type = config[ProjTrainingParams.norm_type]
 
     model_weights_file = config[PredictionParams.model_weights_file]
-    # model = select_2d_model(config)
-    model = simpleCNN(config)
+    model = select_2d_model(config, last_activation='relu')
+    # model = simpleCNN(config)
     print('Reading weights ....')
     model.load_weights(model_weights_file)
 
@@ -76,13 +79,11 @@ if __name__ == '__main__':
         output_field_increment = read_netcdf(inc_file, output_fields, z_layers)
 
         # ******************* Normalizing and Cropping Data *******************
-        # for start_row in np.arange(0, 891-rows, rows):
-        #     for start_col in np.arange(0, 1401-cols, cols):
-        for start_row in np.arange(0, 891-rows, 200):
-            for start_col in np.arange(0, 1401-cols, 100):
+        for start_row in np.arange(0, 891-rows, rows):
+            for start_col in np.arange(0, 1401-cols, cols):
                 try:
                     input_data, y_data = generateXandY(input_fields_model, input_fields_obs, output_field_increment, field_names, obs_field_names, output_fields,
-                                                       start_row, start_col, rows, cols)
+                                                       start_row, start_col, rows, cols, norm_type=norm_type)
                 except Exception as e:
                     print(F"Failed for {c_file} row:{start_row} col:{start_col}")
                     continue
@@ -104,16 +105,11 @@ if __name__ == '__main__':
                 # Outputs for every intermediate layer
                 layer_outs = [func([X]) for func in functors]
 
-                for layer_to_plot in range(len(model.layers)):
+                for layer_to_plot in range(len(model.layers)-1):
                     title = F'Layer {layer_to_plot}. {c_file}_{start_row:03d}_{start_col:03d}'
                     file_name = F'MODEL_{c_file}_lay_{layer_to_plot}_{start_row:03d}_{start_col:03d}'
-                    plot_intermediate_2dcnn_feature_map(layer_outs[layer_to_plot][0], title=title,
+                    plot_intermediate_2dcnn_feature_map(layer_outs[layer_to_plot][0],
+                                                        input_data=X,
+                                                        title=title,
                                                         output_folder=output_folder,
                                                         file_name=file_name, disp_images=False)
-
-                # # ============Output from intermediate layers
-                # intermediate_layer_model = Model(inputs=model.input,
-                #                                  outputs=model.get_layer('conv2d').output)
-                #
-                # intermediate_output = intermediate_layer_model.predict(input_array)
-                # plot_intermediate_2dcnn_feature_map(intermediate_output,  title='Intermediate layer')

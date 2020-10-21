@@ -22,6 +22,12 @@ class PreprocParams(Enum):
     fields_names_obs = 9   # Array with the names of the fields in the observation data to be analyzed
     plot_modes_per_field = 10  # How to plot each field (contour or raster)
     layers_to_plot = 11  # Which Z-axis layers to plot
+    zero_one = 13
+    mean_var = 14
+    type_model = 15
+    type_obs = 16
+    type_inc = 17
+
 
 
 class ParallelParams(Enum):
@@ -40,6 +46,7 @@ class ProjTrainingParams(Enum):
     prediction_time = 11  # Number of days to make the prediction for
     rows = 12 # The number of rows we will tak from the whole images for training and everything
     cols = 13 # The number of columns we will tak from the whole images for training and everything
+    norm_type = 14
 
 class PredictionParams(Enum):
     input_folder = 1  # Where the images are stored

@@ -71,6 +71,7 @@ if __name__ == '__main__':
     model_name = F'{run_name}_{now}'
 
     # ******************* Selecting the model **********************
+    # model = select_2d_model(config, last_activation=None)
     model = select_2d_model(config, last_activation='relu')
     # model = simpleCNN(config)
 

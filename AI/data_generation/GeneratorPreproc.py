@@ -29,6 +29,7 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
 
     rows = config[ProjTrainingParams.rows]
     cols = config[ProjTrainingParams.cols]
+    norm_type = config[ProjTrainingParams.norm_type]
 
     while True:
         # These lines are for sequential selection
@@ -71,7 +72,7 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
 
                 try:
                     input_data, y_data = generateXandY(input_fields_model, input_fields_obs, output_field_increment, field_names, obs_field_names, output_fields,
-                      start_row, start_col, rows, cols)
+                      start_row, start_col, rows, cols, norm_type=norm_type)
 
                 except Exception as e:
                     # print(F"Failed for {model_file_name} row:{start_row} col:{start_col}: {e}")
@@ -86,17 +87,19 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
                 # We set a value of 0.5 on the land. Trying a new loss function that do not takes into account land
                 X = np.nan_to_num(X, nan=0)
                 Y = np.nan_to_num(Y, nan=-0.5)
+                # X = np.nan_to_num(X, nan=0)
+                # Y = np.nan_to_num(Y, nan=0)
 
                 # --------------- Just for debugging Plotting input and output---------------------------
                 # import matplotlib.pyplot as plt
                 # import pylab
-                # mincbar = np.nanmin(input_data)
-                # maxcbar = np.nanmax(input_data)
-
-                # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
+                # # mincbar = np.nanmin(input_data)
+                # # maxcbar = np.nanmax(input_data)
+                #
+                # # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
                 # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False)
-
-                # viz_obj.plot_2d_data_np_raw(np.concatenate((input_data.swapaxes(0,2), y_data.swapaxes(0,2))),
+                # #
+                # # viz_obj.plot_2d_data_np_raw(np.concatenate((input_data.swapaxes(0,2), y_data.swapaxes(0,2))),
                 # viz_obj.plot_2d_data_np_raw(np.concatenate((X[0,:,:,:].swapaxes(0,2), Y[0,:,:,:].swapaxes(0,2))),
                 #                             var_names=[F"in_model_{x}" for x in field_names] +
                 #                                       [F"in_obs_{x}" for x in obs_field_names]+
