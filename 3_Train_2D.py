@@ -4,24 +4,23 @@ from config.MainConfig import get_training_2d
 # from AI.data_generation.Generators2D import data_gen_hycomtsis
 from AI.data_generation.GeneratorPreproc import data_gen_from_preproc
 
-from constants_proj.AI_proj_params import ProjTrainingParams, ParallelParams
+from constants_proj.AI_proj_params import ProjTrainingParams, ParallelParams, NetworkTypes
 import trainingutils as utilsNN
 # import models.modelBuilder3D as model_builder
 from models.modelSelector import select_2d_model
-from models_proj.models import simpleCNN
+from models_proj.models import *
 from img_viz.common import create_folder
 from io_project.read_utils import get_preproc_increment_files
+
 from os.path import join
 import numpy as np
 import os
 from constants.AI_params import TrainingParams, ModelParams
 
 from tensorflow.keras.utils import plot_model
+from tensorflow.keras.layers import LeakyReLU
 
-if __name__ == '__main__':
-
-    config = get_training_2d()
-
+def doTraining(conf):
     input_folder_preproc = config[ProjTrainingParams.input_folder_preproc]
     # input_folder_obs = config[ProjTrainingParams.input_folder_obs]
     years = config[ProjTrainingParams.YEARS]
@@ -71,9 +70,17 @@ if __name__ == '__main__':
     model_name = F'{run_name}_{now}'
 
     # ******************* Selecting the model **********************
-    # model = select_2d_model(config, last_activation=None)
-    model = select_2d_model(config, last_activation='relu')
-    # model = simpleCNN(config)
+    net_type = config[ProjTrainingParams.network_type]
+    if net_type == NetworkTypes.UNET or net_type == NetworkTypes.UNET_MultiStream:
+        model = select_2d_model(config, last_activation=None)
+    if net_type == NetworkTypes.SimpleCNN_2:
+        model = simpleCNN(config, nn_type="2d", hid_lay=2, out_lay=2)
+    if net_type == NetworkTypes.SimpleCNN_4:
+        model = simpleCNN(config, nn_type="2d", hid_lay=4, out_lay=2)
+    if net_type == NetworkTypes.SimpleCNN_8:
+        model = simpleCNN(config, nn_type="2d", hid_lay=8, out_lay=2)
+    if net_type == NetworkTypes.SimpleCNN_16:
+        model = simpleCNN(config, nn_type="2d", hid_lay=16, out_lay=2)
 
     plot_model(model, to_file=join(output_folder,F'{model_name}.png'), show_shapes=True)
 
@@ -99,10 +106,36 @@ if __name__ == '__main__':
     # Decide which generator to use
     data_augmentation = config[TrainingParams.data_augmentation]
 
-    model.fit_generator(generator_train, steps_per_epoch=min(100, len(train_ids)),
+    model.fit_generator(generator_train, steps_per_epoch=1000,
                         validation_data=generator_val,
-                        validation_steps=min(20, len(val_ids)),
+                        validation_steps=min(100, len(val_ids)),
                         use_multiprocessing=False,
                         workers=1,
                         # validation_freq=10, # How often to compute the validation loss
                         epochs=epochs, callbacks=[logger, save_callback, stop_callback])
+
+
+if __name__ == '__main__':
+    config = get_training_2d()
+    # Single training
+    # doTraining(config)
+
+    # ====================== Multiple trainings ==========================
+    # ---------- Changing output variable -----------------
+    output_fields = ['srfhgt', 'temp', 'salin', 'u-vel.', 'v-vel.']
+
+    orig_name = config[TrainingParams.config_name]
+    for out_field in output_fields:
+        config[TrainingParams.config_name] = orig_name.replace("VAR", out_field.upper())
+        config[ProjTrainingParams.output_fields] = [out_field]
+        doTraining(config)
+
+    # ---------- Changing Network architecture -----------------
+    network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
+    network_types_names = ["UNET", "SimpleCNN_2", "SimpleCNN_4", "SimpleCNN_8", "SimpleCNN_16"]
+
+    orig_name = config[TrainingParams.config_name]
+    for i, net_type_id in enumerate(network_types):
+        config[TrainingParams.config_name] = orig_name.replace("NETWORK", network_types_names[i])
+        config[ProjTrainingParams.network_type] = net_type_id
+        doTraining(config)

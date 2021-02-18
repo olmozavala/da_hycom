@@ -33,6 +33,13 @@ class PreprocParams(Enum):
 class ParallelParams(Enum):
     NUM_PROC = 1
 
+class NetworkTypes(Enum):
+    UNET = 1
+    UNET_MultiStream = 2
+    SimpleCNN_2 = 3
+    SimpleCNN_4 = 4
+    SimpleCNN_8 = 5
+    SimpleCNN_16= 5
 
 class ProjTrainingParams(Enum):
     input_folder_preproc = 20
@@ -47,6 +54,8 @@ class ProjTrainingParams(Enum):
     rows = 12 # The number of rows we will tak from the whole images for training and everything
     cols = 13 # The number of columns we will tak from the whole images for training and everything
     norm_type = 14
+    network_type = 15 # Indicates which network to use`
+    output_folder_summary_models = 16  # Where to output the data
 
 class PredictionParams(Enum):
     input_folder = 1  # Where the images are stored

@@ -1,3 +1,11 @@
+Folders
+===========
+
+Software: `/home/olmozavala/Dropbox/MyProjects/EOAS/COAPS/MURI_AI_Ocean/Data_Assimilation/HYCOM-TSIS`
+Outputs: `/data/HYCOM/DA_HYCOM_TSIS`
+Summary Results:  https://docs.google.com/spreadsheets/d/1EqkI2K6BA5jnXTny7w_U28vN1JUPn_h0J16SLqV1mgA/edit?usp=sharing
+
+
 Data
 ===========
 
