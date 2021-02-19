@@ -3,7 +3,7 @@ from constants_proj.AI_proj_params import PreprocParams
 import pandas as pd
 from pandas import DataFrame
 import numpy.ma as ma
-from constants_proj.AI_proj_params import MAX_MODEL, MAX_OBS, MIN_OBS, MIN_MODEL, MAX_INCREMENT, MIN_INCREMENT
+from constants_proj.AI_proj_params import MAX_MODEL, MAX_OBS, MIN_OBS, MIN_MODEL, MAX_INCREMENT, MIN_INCREMENT, MIN_STDVAR, MAX_STDVAR
 from os.path import join, isfile
 import os
 import numpy as np
@@ -105,6 +105,8 @@ def normalizeData(data, field_name, data_type = PreprocParams.type_model, norm_t
                 output_data = (data.filled(np.nan) - MIN_OBS[field_name])/(MAX_OBS[field_name] - MIN_OBS[field_name])
             if data_type == PreprocParams.type_inc:
                 output_data = (data - MIN_INCREMENT[field_name]) /(MAX_INCREMENT[field_name] - MIN_INCREMENT[field_name])
+            if data_type == PreprocParams.type_stdvar:
+                output_data = (data - MIN_STDVAR[field_name]) /(MAX_STDVAR[field_name] - MIN_STDVAR[field_name])
         else:
             if data_type == PreprocParams.type_model:
                 output_data = (data*(MAX_MODEL[field_name] - MIN_MODEL[field_name])) + MIN_MODEL[field_name]
@@ -112,6 +114,8 @@ def normalizeData(data, field_name, data_type = PreprocParams.type_model, norm_t
                 output_data = (data*(MAX_OBS[field_name] - MIN_OBS[field_name])) + MIN_OBS[field_name]
             if data_type == PreprocParams.type_inc:
                 output_data = (data*(MAX_INCREMENT[field_name] - MIN_INCREMENT[field_name])) + MIN_INCREMENT[field_name]
+            if data_type == PreprocParams.type_stdvar:
+                output_data = (data*(MAX_STDVAR[field_name] - MIN_STDVAR[field_name])) + MIN_STDVAR[field_name]
 
         return output_data
 
@@ -134,8 +138,9 @@ def normalizeData(data, field_name, data_type = PreprocParams.type_model, norm_t
 
         return output_data.filled(np.nan)
 
-def generateXandYMulti(input_fields_model, input_fields_obs, output_field_increment, field_names, obs_field_names, output_fields,
-                  start_row, start_col, rows, cols, norm_type = PreprocParams.mean_var):
+def generateXandYMulti(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
+                       field_names, obs_field_names, var_field_names, output_fields,
+                      start_row, start_col, rows, cols, norm_type = PreprocParams.mean_var):
     """
     This function will generate X and Y boxes depening on the required field names and bboxes
     :param input_fields_model:
@@ -150,7 +155,7 @@ def generateXandYMulti(input_fields_model, input_fields_obs, output_field_increm
     :param cols:
     :return:
     """
-    num_fields = len(field_names) + len(obs_field_names)
+    num_fields = len(field_names) + len(obs_field_names) + len(var_field_names)
     input_data = []
     tot_output_fields = len(output_fields)
     y_data = np.zeros((rows, cols, tot_output_fields))
@@ -193,6 +198,13 @@ def generateXandYMulti(input_fields_model, input_fields_obs, output_field_increm
                                                    norm_type=norm_type, normalize=True), axis=2))
         id_field += 1
 
+    # ******* Adding the variance fields for input ********
+    for c_field in var_field_names:
+        temp_data = input_fields_var[c_field][start_row:end_row, start_col:end_col]
+        input_data.append(np.expand_dims(normalizeData(temp_data, c_field, data_type=PreprocParams.type_stdvar,
+                                                       norm_type=norm_type, normalize=True), axis=2))
+        id_field += 1
+
     # ******************* Filling the 'output' data ***************
     id_field = 0
     for c_field in output_fields:
@@ -210,7 +222,8 @@ def generateXandYMulti(input_fields_model, input_fields_obs, output_field_increm
 
     return input_data, y_data
 
-def generateXandY(input_fields_model, input_fields_obs, output_field_increment, field_names, obs_field_names, output_fields,
+def generateXandY(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
+                  field_names, obs_field_names, var_field_names, output_fields,
                   start_row, start_col, rows, cols, norm_type = PreprocParams.mean_var):
     """
     This function will generate X and Y boxes depening on the required field names and bboxes
@@ -226,7 +239,7 @@ def generateXandY(input_fields_model, input_fields_obs, output_field_increment, 
     :param cols:
     :return:
     """
-    num_fields = len(field_names) + len(obs_field_names)
+    num_fields = len(field_names) + len(obs_field_names) + len(var_field_names)
     input_data = np.zeros((rows, cols, num_fields))
     tot_output_fields = len(output_fields)
     y_data = np.zeros((rows, cols, tot_output_fields))
@@ -268,6 +281,19 @@ def generateXandY(input_fields_model, input_fields_obs, output_field_increment, 
                                                    norm_type=norm_type, normalize=True)
         id_field += 1
 
+    # ******* Adding the variance fields for input ********
+    for c_field in var_field_names:
+        # TODO z_layers are hardcoded, should have been filtered before
+        if len(input_fields_var[c_field].shape) > 2:
+            temp_data = input_fields_var[c_field][0, start_row:end_row, start_col:end_col]
+        else:
+            temp_data = input_fields_var[c_field][start_row:end_row, start_col:end_col]
+        # input_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_obs,
+        #                                            norm_type=norm_type, normalize=True)
+
+        input_data[:, :, id_field] = temp_data
+        id_field += 1
+
     # ******************* Filling the 'output' data ***************
     id_field = 0
     for c_field in output_fields:
@@ -281,7 +307,6 @@ def generateXandY(input_fields_model, input_fields_obs, output_field_increment, 
         #                             var_names= [F"out_inc_{x}" for x in output_fields],
         #                             file_name=F"delete")
         id_field += 1
-
 
     return input_data, y_data
     # return input_data, input_data

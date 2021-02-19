@@ -14,8 +14,14 @@ from img_viz.common import create_folder
 # that have been tested. Grouping by each modified parameter
 
 def getNetworkType(name):
-    if "simple_cnn" in name:
-        return "Simple_CNN"
+    if "simplecnn_2" in name:
+        return "Simple_CNN_2"
+    if "simplecnn_4" in name:
+        return "Simple_CNN_4"
+    if "simplecnn_8" in name:
+        return "Simple_CNN_8"
+    if "simplecnn_16" in name:
+        return "Simple_CNN_16"
     if "unet" in name:
         return "UNET"
     if "unet_multistream" in name:
@@ -27,6 +33,8 @@ def getInputFields(name):
     if "Input_All_with_Obs_No_SSH_NO_LATLON".lower() in name:
         # return "ALL no SSH, no LATLON ( temp, salin, u-vel., v-vel., sst, sss, ssh)"
         return "ALLNoSSHnoLATLON"
+    if "All_wvar".lower() in name:
+        return "All w/VAR"
     if "all_intput_with_latlon" in name:
         # return "ALL with LATLON ( temp, srfhgt, salin, u-vel., v-vel., LAT, LON ,sst, sss, ssh)"
         return "ALLwithLATLON"
@@ -41,12 +49,17 @@ def getInputFields(name):
     return "Unknown"
 
 def getOutputFields(name):
-    if "output_only_temp" in name or "onlytemp" in name:
-        return "Temp"
-    if "output_only_ssh" in name or "onlyssh" in name:
+    if "output_only_salin" in name:
+        return "Salinity"
+    if "output_only_srfhgt" in name:
         return "SSH"
-    if "all_output" in name or "output_all" in name:
-        return "All"
+    if "output_only_temp" in name:
+        return "Temp"
+    if "output_only_u-vel" in name:
+        return "U"
+    if "output_only_v-vel" in name:
+        return "V"
+
     return "Unknown"
 
 def getBBOX(name):
@@ -107,7 +120,13 @@ if __name__ == '__main__':
 
     for col in ["Network Type", "BBOX", "Input vars", "Output vars"]:
         for grp in summary.groupby(col):
-            plt.scatter(range(len(grp[1])), grp[1]["Loss value"].values, label=grp[0])
+            print(grp[1].index.values)
+            x = grp[1].index.values
+            y = grp[1]["Loss value"].values
+            out_var = grp[1]["Output vars"].values
+            plt.scatter(x, y, label=grp[0])
+            for i in range(len(x)):
+                plt.annotate(out_var[i], (x[i]+.1,y[i]))
         plt.legend(bbox_to_anchor=(1.1, 1.05))
         plt.title(F"Grouped by {col}")
         plt.savefig(join(output_folder,F"{col.replace(' ','_')}.png"))

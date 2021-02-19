@@ -3,6 +3,9 @@ from enum import Enum
 MAX_MODEL = {'temp': 35, 'srfhgt': 10, 'salin': 40, 'u-vel.': 3, 'v-vel.': 3, 'LAT': 90 , 'LON': 180}
 MIN_MODEL = {'temp': 10, 'srfhgt': -10, 'salin': 0, 'u-vel.':-3, 'v-vel.':-3, 'LAT':-90 , 'LON':-180}
 
+MIN_STDVAR = {'tem': 0.0, 'sal': 0.0, 'ssh': 0.0, 'mdt':-0.58}
+MAX_STDVAR = {'tem': 6.0, 'sal': 4.7, 'ssh': 0.3, 'mdt': 0.22}
+
 MAX_OBS = {'sst': 40, 'ssh': 0.9, 'sss': 40}
 MIN_OBS = {'sst': 0,  'ssh':-0.9, 'sss': 0}
 
@@ -27,6 +30,7 @@ class PreprocParams(Enum):
     type_model = 15
     type_obs = 16
     type_inc = 17
+    type_stdvar = 18
 
 
 
@@ -49,6 +53,7 @@ class ProjTrainingParams(Enum):
     MONTHS = 7  # Array with the months to be analyzed
     fields_names = 8  # Array with the names of the fields to be analyzed
     fields_names_obs = 9   # Array with the names of the fields in the observation data to be analyzed
+    fields_names_var = 30   # Array with the names of the fields in the observation data to be analyzed
     output_fields = 10  # String containing the name of the output field
     prediction_time = 11  # Number of days to make the prediction for
     rows = 12 # The number of rows we will tak from the whole images for training and everything

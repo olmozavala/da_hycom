@@ -39,9 +39,6 @@ def doTraining(conf):
     run_name = config[TrainingParams.config_name]
     optimizer = config[TrainingParams.optimizer]
 
-    nn_input_size = config[ModelParams.INPUT_SIZE]
-    model_type = config[ModelParams.MODEL]
-
     output_folder = join(output_folder, run_name)
     split_info_folder = join(output_folder, 'Splits')
     parameters_folder = join(output_folder, 'Parameters')
@@ -59,7 +56,8 @@ def doTraining(conf):
     # ================ Split definition =================
     [train_ids, val_ids, test_ids] = utilsNN.split_train_validation_and_test(tot_examples,
                                                                              val_percentage=val_perc,
-                                                                             test_percentage=test_perc)
+                                                                             test_percentage=test_perc,
+                                                                             shuffle_ids=False)
 
     print(F"Train examples (total:{len(train_ids)}) :{files_to_read[train_ids]}")
     print(F"Validation examples (total:{len(val_ids)}) :{files_to_read[val_ids]}:")
@@ -108,7 +106,8 @@ def doTraining(conf):
 
     model.fit_generator(generator_train, steps_per_epoch=1000,
                         validation_data=generator_val,
-                        validation_steps=min(100, len(val_ids)),
+                        # validation_steps=min(100, len(val_ids)),
+                        validation_steps=100,
                         use_multiprocessing=False,
                         workers=1,
                         # validation_freq=10, # How often to compute the validation loss
@@ -125,17 +124,31 @@ if __name__ == '__main__':
     output_fields = ['srfhgt', 'temp', 'salin', 'u-vel.', 'v-vel.']
 
     orig_name = config[TrainingParams.config_name]
-    for out_field in output_fields:
-        config[TrainingParams.config_name] = orig_name.replace("VAR", out_field.upper())
-        config[ProjTrainingParams.output_fields] = [out_field]
-        doTraining(config)
+    depth = len(config[ProjTrainingParams.fields_names]) + len(config[ProjTrainingParams.fields_names_obs]) + len(config[ProjTrainingParams.fields_names_var])
+    config[ModelParams.INPUT_SIZE][2] = depth
+
+    start_i = 1
+    N = 5 # How many networks we want to run for each experiment
+    # In this case it is always a UNET
+    local_name = orig_name.replace("NETWORK", "NET_UNET")
+    for i in range(N):
+        run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
+        for out_field in output_fields:
+            config[TrainingParams.config_name] = run_name.replace("OUTPUT", F"OUT_{out_field.upper()}")
+            config[ProjTrainingParams.output_fields] = [out_field]
+            doTraining(config)
+            print(config[TrainingParams.config_name])
 
     # ---------- Changing Network architecture -----------------
-    network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
-    network_types_names = ["UNET", "SimpleCNN_2", "SimpleCNN_4", "SimpleCNN_8", "SimpleCNN_16"]
+    print(" --------------- Testing different architectures -------------------")
+    network_types = [NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
+    network_types_names = ["SimpleCNN_2", "SimpleCNN_4", "SimpleCNN_8", "SimpleCNN_16"]
 
-    orig_name = config[TrainingParams.config_name]
-    for i, net_type_id in enumerate(network_types):
-        config[TrainingParams.config_name] = orig_name.replace("NETWORK", network_types_names[i])
-        config[ProjTrainingParams.network_type] = net_type_id
-        doTraining(config)
+    local_name = orig_name.replace("OUTPUT", "SRFHGT")
+    for i in range(N):
+        run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
+        for i, net_type_id in enumerate(network_types):
+            config[TrainingParams.config_name] = run_name.replace("NETWORK", F"NET_{network_types_names[i]}")
+            print(config[TrainingParams.config_name])
+            config[ProjTrainingParams.network_type] = net_type_id
+            doTraining(config)

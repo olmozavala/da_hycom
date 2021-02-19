@@ -6,17 +6,24 @@ from img_viz.constants import PlotMode
 from preproc.UtilsDates import get_days_from_month
 from preproc.metrics import mse
 from io_project.read_utils import *
+import pandas as pd
 import re
 import numpy as np
 from multiprocessing import Pool
 from constants_proj.AI_proj_params import PreprocParams, ParallelParams, ProjTrainingParams
 from config.MainConfig import get_training_2d
+import matplotlib.pyplot as plt
 
 # Not sure how to move this inside the function
 NUM_PROC = 10
 
-def parallel_proc(proc_id):
-    # /data/COAPS_nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES
+# /data/COAPS_nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES
+
+def ComputeOverallMinMaxVar():
+    """
+    Computes the mean, max and variance for all the fields in the files
+    :return:
+    """
     config = get_training_2d()
     input_folder = config[ProjTrainingParams.input_folder_preproc]
     fields = config[ProjTrainingParams.fields_names]
@@ -46,6 +53,7 @@ def parallel_proc(proc_id):
     # model_files = model_files[55:58]
     tot_files = len(model_files)
 
+    # Iterate over all the model files
     for id_file, c_file in enumerate(model_files):
         print(F"Working with {c_file}")
         # Find current and next date
@@ -172,14 +180,54 @@ def parallel_proc(proc_id):
 
     f.close()
 
+def ComputeMinMaxSTDFields(file_name, fields_names, output_file):
+
+    data = read_netcdf(file_name, [], [0])
+    out_fields = []
+    out_mins = []
+    out_maxs = []
+    out_vars = []
+    out_means = []
+
+    for field_name in fields_names:
+        if len(data[field_name].shape) == 2:
+            field = data[field_name][:]
+        elif len(data[field_name].shape) == 3:
+            field = data[field_name][0, :]
+
+        # im = plt.imshow(np.flip(field, axis=0), cmap='gist_earth')
+        # plt.colorbar(im)
+        # plt.title(field_name)
+        # plt.show()
+
+        out_fields.append(field_name)
+        out_mins.append(np.amin(field))
+        out_maxs.append(np.amax(field))
+        out_means.append(np.mean(field))
+        out_vars.append(np.var(field))
+
+    out_dic = {"Name": ["STD" for x in range(len(out_fields))],
+               "Field": out_fields,
+               "MIN": out_mins,
+               "MAX": out_maxs,
+               "MEAN": out_means,
+               "VAR": out_vars,
+               }
+
+    df = pd.DataFrame.from_dict(out_dic)
+
+    df.to_csv(output_file)
 
 
 
 def main():
     # p = Pool(NUM_PROC)
     # p.map(parallel_proc, range(NUM_PROC))
-    # ---------- Sequencial -------------
-    parallel_proc(1)
+    # ---------- -------------
+    # ComputeOverallMinMaxVar()
+    std_file = "/data/HYCOM/DA_HYCOM_TSIS/preproc/cov_mat/tops_ias_std.nc"
+    ComputeMinMaxSTDFields(std_file, ['tem', 'sal', 'ssh', 'mdt'], "STD_vars_min_max.csv")
 
 if __name__ == '__main__':
     main()
+

@@ -24,6 +24,7 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
     obs_files = np.array([join(input_folder_preproc, x) for x in all_files if x.startswith('obs')])
     increment_files = np.array([join(input_folder_preproc, x) for x in all_files if x.startswith('increment')])
     model_files = np.array([join(input_folder_preproc, x) for x in all_files if x.startswith('model')])
+    var_file = join(input_folder_preproc, "cov_mat", "tops_ias_std.nc")
     obs_files.sort()
     increment_files.sort()
     model_files.sort()
@@ -31,6 +32,13 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
     rows = config[ProjTrainingParams.rows]
     cols = config[ProjTrainingParams.cols]
     norm_type = config[ProjTrainingParams.norm_type]
+
+    # Read the variance of selected
+    var_field_names = config[ProjTrainingParams.fields_names_var]
+    if len(var_field_names) > 0:
+        input_fields_var = read_netcdf(var_file, var_field_names, z_layers)
+    else:
+        input_fields_var = []
 
     while True:
         # These lines are for sequential selection
@@ -74,10 +82,12 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
                 try:
 
                     if config[ModelParams.MODEL] == AiModels.UNET_2D_MULTISTREAMS:
-                        input_data, y_data = generateXandYMulti(input_fields_model, input_fields_obs, output_field_increment, field_names, obs_field_names, output_fields,
+                        input_data, y_data = generateXandYMulti(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
+                                                                field_names, obs_field_names, var_field_names, output_fields,
                                                            start_row, start_col, rows, cols, norm_type=norm_type)
                     else:
-                        input_data, y_data = generateXandY(input_fields_model, input_fields_obs, output_field_increment, field_names, obs_field_names, output_fields,
+                        input_data, y_data = generateXandY(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
+                                                           field_names, obs_field_names, var_field_names, output_fields,
                                                            start_row, start_col, rows, cols, norm_type=norm_type)
 
                 except Exception as e:

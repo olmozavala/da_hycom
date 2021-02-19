@@ -90,10 +90,10 @@ def simpleCNN(model_params, nn_type="2d", hid_lay=2, out_lay=2):
         for layer in range(hid_lay):
             if layer == 0:
                 cnn_layer, _ = model_builder_2d.multiple_conv_lay_2d(inputs, num_filters, filter_size, make_pool=False, batch_norm=True,
-                                                                    activation=LeakyReLU(alpha=0.2), dropout=False, tot_layers=2)
+                                                                    activation=LeakyReLU(alpha=0.2), dropout=False, tot_layers=1)
             else:
                 cnn_layer, _ = model_builder_2d.multiple_conv_lay_2d(cnn_layer, num_filters*2, filter_size, make_pool=False, batch_norm=True,
-                                                                    activation=LeakyReLU(alpha=0.2), dropout=False, tot_layers=2)
+                                                                    activation=LeakyReLU(alpha=0.2), dropout=False, tot_layers=1)
 
         for dense_lay in range(out_lay-1):
             cnn_layer = Conv2D(number_output_filters, (1, 1), activation=LeakyReLU(alpha=0.2))(cnn_layer)
