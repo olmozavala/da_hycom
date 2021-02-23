@@ -119,36 +119,39 @@ if __name__ == '__main__':
     # Single training
     # doTraining(config)
 
+    # ====================================================================
     # ====================== Multiple trainings ==========================
-    # ---------- Changing output variable -----------------
+    # ====================================================================
+
+    # ========== Changing output variable =================
     output_fields = ['srfhgt', 'temp', 'salin', 'u-vel.', 'v-vel.']
 
     orig_name = config[TrainingParams.config_name]
     depth = len(config[ProjTrainingParams.fields_names]) + len(config[ProjTrainingParams.fields_names_obs]) + len(config[ProjTrainingParams.fields_names_var])
     config[ModelParams.INPUT_SIZE][2] = depth
 
-    start_i = 1
-    N = 5 # How many networks we want to run for each experiment
+    start_i = 0
+    N = 1 # How many networks we want to run for each experiment
     # In this case it is always a UNET
     local_name = orig_name.replace("NETWORK", "NET_UNET")
     for i in range(N):
-        run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
-        for out_field in output_fields:
-            config[TrainingParams.config_name] = run_name.replace("OUTPUT", F"OUT_{out_field.upper()}")
-            config[ProjTrainingParams.output_fields] = [out_field]
-            doTraining(config)
-            print(config[TrainingParams.config_name])
+       run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
+       for out_field in output_fields:
+           config[TrainingParams.config_name] = run_name.replace("OUTPUT", F"OUT_{out_field.upper()}")
+           config[ProjTrainingParams.output_fields] = [out_field]
+           doTraining(config)
+           print(config[TrainingParams.config_name])
 
-    # ---------- Changing Network architecture -----------------
-    print(" --------------- Testing different architectures -------------------")
-    network_types = [NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
-    network_types_names = ["SimpleCNN_2", "SimpleCNN_4", "SimpleCNN_8", "SimpleCNN_16"]
-
-    local_name = orig_name.replace("OUTPUT", "SRFHGT")
-    for i in range(N):
-        run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
-        for i, net_type_id in enumerate(network_types):
-            config[TrainingParams.config_name] = run_name.replace("NETWORK", F"NET_{network_types_names[i]}")
-            print(config[TrainingParams.config_name])
-            config[ProjTrainingParams.network_type] = net_type_id
-            doTraining(config)
+    # ========== Testing Network architecture =================
+    # print(" --------------- Testing different architectures -------------------")
+    # network_types = [NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
+    # network_types_names = ["SimpleCNN_2", "SimpleCNN_4", "SimpleCNN_8", "SimpleCNN_16"]
+    #
+    # local_name = orig_name.replace("OUTPUT", "OUT_SRFHGT")
+    # for i in range(N):
+    #     run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
+    #     for i, net_type_id in enumerate(network_types):
+    #         config[TrainingParams.config_name] = run_name.replace("NETWORK", F"NET_{network_types_names[i]}")
+    #         print(config[TrainingParams.config_name])
+    #         config[ProjTrainingParams.network_type] = net_type_id
+    #         doTraining(config)

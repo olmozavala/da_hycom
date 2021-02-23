@@ -70,8 +70,8 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
                 continue
 
             # *********************** Reading files **************************
-            input_fields_obs = read_netcdf(obs_file_name, obs_field_names, z_layers)
             input_fields_model = read_netcdf(model_file_name, field_names, z_layers)
+            input_fields_obs = read_netcdf(obs_file_name, obs_field_names, z_layers)
             output_field_increment = read_netcdf(output_file_name, output_fields, z_layers)
 
             succ_attempts = 0
@@ -117,7 +117,7 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
                 # # maxcbar = np.nanmax(input_data)
                 #
                 # # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
-                # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False)
+                # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=True)
                 # #
                 # # viz_obj.plot_2d_data_np_raw(np.concatenate((input_data.swapaxes(0,2), y_data.swapaxes(0,2))),
                 # viz_obj.plot_2d_data_np_raw(np.concatenate((X[0,:,:,:].swapaxes(0,2), Y[0,:,:,:].swapaxes(0,2))),

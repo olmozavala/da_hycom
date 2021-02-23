@@ -43,7 +43,7 @@ class NetworkTypes(Enum):
     SimpleCNN_2 = 3
     SimpleCNN_4 = 4
     SimpleCNN_8 = 5
-    SimpleCNN_16= 5
+    SimpleCNN_16 = 6
 
 class ProjTrainingParams(Enum):
     input_folder_preproc = 20

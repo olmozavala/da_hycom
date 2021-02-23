@@ -13,6 +13,11 @@ from constants_proj.AI_proj_params import PreprocParams, ParallelParams
 from config.PreprocConfig import get_preproc_config
 from preproc.UtilsDates import get_day_of_year_from_month_and_day
 from sklearn.metrics import mean_squared_error
+import matplotlib.pyplot as plt
+
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import cartopy
 
 NUM_PROC = 1
 
@@ -249,7 +254,7 @@ def testing():
     import matplotlib.pyplot as plt
     import math
 
-    # Computing the MSE between the 'free run and the DA surn
+    # Computing the MSE between the 'free run and the DA run
     input_folder = '/data/HYCOM/DA_HYCOM_TSIS/preproc'
     years = [2009, 2010, 2011]
     months = range(1,13)
@@ -282,6 +287,81 @@ def testing():
                     print(F"Failed for {year}_{month}_{field}: {e}")
                     continue
 
+def getExtent(lats, lons):
+    minLat = np.amin(lats)
+    maxLat = np.amax(lats)
+    minLon = np.amin(lons)
+    maxLon = np.amax(lons)
+    bbox = (minLon, maxLon, minLat, maxLat)
+    return bbox
+
+def plotMaps1(data, titles, suptitle, lat, lon):
+    n = len(titles)
+    fs = 12
+    fig, axis = plt.subplots(1,n, figsize=(fs*2, fs))
+    for i in range(len(titles)):
+        # ax = plt.subplot(1, n, i+1, projection=ccrs.PlateCarree())
+        ax = plt.subplot(1, n, i+1, projection=ccrs.Mercator())
+        ax.coastlines(resolution='50m')  # Draws the coastline
+        if i != 2:
+            im = ax.imshow(data[i], cmap='jet', vmin=10, vmax=32, extent=getExtent(lat, lon))
+        else:
+            im = ax.imshow(data[i], cmap='jet', vmin=-4, vmax=4, extent=getExtent(lat, lon))
+
+        # ax.stock_img()  # Draws a basic topography
+        # ax.add_feature(cartopy.feature.OCEAN)
+        # ax.add_feature(cartopy.feature.LAND, edgecolor='black')
+        # ax.add_feature(cartopy.feature.LAKES, edgecolor='black')
+        # ax.add_feature(cartopy.feature.RIVERS)
+
+        ax.set_title(titles[i])
+        ax.axis('off')
+
+        cbar = fig.colorbar(im, ax=ax, shrink=0.3)
+        # cbar.ax.tick_params(labelsize=font_size_cbar)
+        # cbar.set_label(self._units, fontsize=font_size_cbar*1.2)
+    # fig.suptitle(suptitle)
+
+def visualizeBackgroundIncrementAnalaysis():
+    input_folder = '/data/HYCOM/DA_HYCOM_TSIS/preproc'
+    output_folder = '/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/AssimilatedData'
+    years = [2009]
+    fields = ['srfhgt']
+    all_files = os.listdir(input_folder)
+    model_files = [join(input_folder, x) for x in all_files if x.find('model') != -1]
+    obs_files = [join(input_folder, x) for x in all_files if x.find('obs') != -1]
+    inc_files = [join(input_folder, x) for x in all_files if x.find('increment') != -1]
+    # Sort all of them or they won't match
+    inc_files.sort()
+    model_files.sort()
+    obs_files.sort()
+
+
+    mvar = "temp" #"srfhgt"
+    ovar = "sst" #"ssh"
+
+    var_file = "/data/HYCOM/DA_HYCOM_TSIS/preproc/cov_mat/tops_ias_std.nc"
+    data_lat_lon  = read_netcdf(var_file, ['xc', 'yc'])
+    lat = data_lat_lon['yc'][:]
+    lon = data_lat_lon['xc'][:]
+
+    for i in range(len(model_files)):
+        model_data = read_netcdf(model_files[i], [mvar])
+        obs_data_m = read_netcdf(obs_files[i], [ovar])
+        inc_data = read_netcdf(inc_files[i], [mvar])
+        obs_data = model_data[mvar][:].copy()
+        no_mask_at = np.logical_not(obs_data_m[ovar][:].mask)
+        obs_data[no_mask_at] = obs_data_m[ovar][:][no_mask_at]
+
+        data = np.array([model_data[mvar][:], obs_data, inc_data[mvar][:]])
+        plotMaps1(data, ["Background", "Observation", "Increment"], "Title", lat, lon)
+        plt.savefig(join(output_folder, F"{i:004d}.png"),bbox_inches='tight')
+        # plt.show()
+
+
 
 if __name__ == '__main__':
-    main()
+    # main()
+
+    visualizeBackgroundIncrementAnalaysis()
+    print("Done!")
