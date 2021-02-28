@@ -105,7 +105,7 @@ def normalizeData(data, field_name, data_type = PreprocParams.type_model, norm_t
                 output_data = (data.filled(np.nan) - MIN_OBS[field_name])/(MAX_OBS[field_name] - MIN_OBS[field_name])
             if data_type == PreprocParams.type_inc:
                 output_data = (data - MIN_INCREMENT[field_name]) /(MAX_INCREMENT[field_name] - MIN_INCREMENT[field_name])
-            if data_type == PreprocParams.type_stdvar:
+            if data_type == PreprocParams.type_std:
                 output_data = (data - MIN_STDVAR[field_name]) /(MAX_STDVAR[field_name] - MIN_STDVAR[field_name])
         else:
             if data_type == PreprocParams.type_model:
@@ -114,7 +114,7 @@ def normalizeData(data, field_name, data_type = PreprocParams.type_model, norm_t
                 output_data = (data*(MAX_OBS[field_name] - MIN_OBS[field_name])) + MIN_OBS[field_name]
             if data_type == PreprocParams.type_inc:
                 output_data = (data*(MAX_INCREMENT[field_name] - MIN_INCREMENT[field_name])) + MIN_INCREMENT[field_name]
-            if data_type == PreprocParams.type_stdvar:
+            if data_type == PreprocParams.type_std:
                 output_data = (data*(MAX_STDVAR[field_name] - MIN_STDVAR[field_name])) + MIN_STDVAR[field_name]
 
         return output_data
@@ -136,7 +136,10 @@ def normalizeData(data, field_name, data_type = PreprocParams.type_model, norm_t
         else:
             output_data = (data*std_val) + mean_val
 
-        return output_data.filled(np.nan)
+        if type(output_data) is np.ndarray:
+            return output_data
+        else:
+            return output_data.filled(np.nan)
 
 def generateXandYMulti(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
                        field_names, obs_field_names, var_field_names, output_fields,
@@ -201,7 +204,7 @@ def generateXandYMulti(input_fields_model, input_fields_obs, input_fields_var, o
     # ******* Adding the variance fields for input ********
     for c_field in var_field_names:
         temp_data = input_fields_var[c_field][start_row:end_row, start_col:end_col]
-        input_data.append(np.expand_dims(normalizeData(temp_data, c_field, data_type=PreprocParams.type_stdvar,
+        input_data.append(np.expand_dims(normalizeData(temp_data, c_field, data_type=PreprocParams.type_std,
                                                        norm_type=norm_type, normalize=True), axis=2))
         id_field += 1
 
@@ -224,7 +227,7 @@ def generateXandYMulti(input_fields_model, input_fields_obs, input_fields_var, o
 
 def generateXandY(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
                   field_names, obs_field_names, var_field_names, output_fields,
-                  start_row, start_col, rows, cols, norm_type = PreprocParams.mean_var):
+                  start_row, start_col, rows, cols, norm_type = PreprocParams.mean_var, perc_ocean = 1.0):
     """
     This function will generate X and Y boxes depening on the required field names and bboxes
     :param input_fields_model:
@@ -260,8 +263,8 @@ def generateXandY(input_fields_model, input_fields_obs, input_fields_var, output
         if len(temp_data.mask.shape) != 1: # It means it has at least some ocean values
             if temp_data.mask.min() == False or np.dtype('bool') != temp_data.mask.min(): # Making sure there is at leas some ocean pixels
                 # This is a harder restriction, we force that 90% the pixels are ocean
-                # if temp_data.count() > (.99*temp_data.shape[0]*temp_data.shape[1]): # 99% ocean
-                if temp_data.count() >= (temp_data.shape[0]*temp_data.shape[1]): # Only ocean
+                if temp_data.count() >= (perc_ocean*temp_data.shape[0]*temp_data.shape[1]): # 99% ocean
+                # if temp_data.count() >= (temp_data.shape[0]*temp_data.shape[1]): # Only ocean
                     input_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_model,
                                                                norm_type=norm_type, normalize=True)
                     if id_field == 0:

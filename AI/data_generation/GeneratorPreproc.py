@@ -80,7 +80,7 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
                 start_col = np.random.randint(0, 1401 - cols)
 
                 try:
-
+                    perc_ocean = 0.99
                     if config[ModelParams.MODEL] == AiModels.UNET_2D_MULTISTREAMS:
                         input_data, y_data = generateXandYMulti(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
                                                                 field_names, obs_field_names, var_field_names, output_fields,
@@ -88,7 +88,7 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
                     else:
                         input_data, y_data = generateXandY(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
                                                            field_names, obs_field_names, var_field_names, output_fields,
-                                                           start_row, start_col, rows, cols, norm_type=norm_type)
+                                                           start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
 
                 except Exception as e:
                     # print(F"Failed for {model_file_name} row:{start_row} col:{start_col}: {e}")
@@ -117,7 +117,7 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
                 # # maxcbar = np.nanmax(input_data)
                 #
                 # # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
-                # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=True)
+                # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False)
                 # #
                 # # viz_obj.plot_2d_data_np_raw(np.concatenate((input_data.swapaxes(0,2), y_data.swapaxes(0,2))),
                 # viz_obj.plot_2d_data_np_raw(np.concatenate((X[0,:,:,:].swapaxes(0,2), Y[0,:,:,:].swapaxes(0,2))),

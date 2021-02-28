@@ -19,7 +19,7 @@ Hycom: `/Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies/a
 
 TSIS: `/Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies/incup/incupd*`
 
-Observations (ssh, sst, and T and S profiles): `/nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES/tsis_obs*.nc`
+Observations (ssh, sst, and T and S profiles): `/data/COAPS_nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES/tsis_obs*.nc`
 
 **Variables assimialated with TSIS*** are: Temperature (temp), density (calculated from T and S), 
 thickness (thknss), and u and v baroclinic (3D). 

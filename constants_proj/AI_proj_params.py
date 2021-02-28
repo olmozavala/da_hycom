@@ -30,7 +30,7 @@ class PreprocParams(Enum):
     type_model = 15
     type_obs = 16
     type_inc = 17
-    type_stdvar = 18
+    type_std = 18
 
 
 

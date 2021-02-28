@@ -122,6 +122,7 @@ def singleModel(config):
     else:
         input_fields_var = []
 
+    np.random.shuffle(model_files)  # TODO this is only for testing
     for id_file, c_file in enumerate(model_files):
         # Find current and next date
         year = int(c_file.split('_')[1])

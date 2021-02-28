@@ -15,38 +15,45 @@ def getCompleteNameTxt(name):
     final_name = final_name.replace("OUTPUT", F"OUT_{out_names}")
     return final_name
 
-
 def getNetworkTypeTxt(name):
-    sections = name.split("_")
+    sections = name[name.find("NET"):].split("_")
     if "simplecnn" in name.lower():
-        return F"{sections[2]}_{sections[3]}"
+        return F"{sections[1]}_{sections[2]}"
     else:
-        return F"{sections[2]}"
+        return F"{sections[1]}"
     return "Unknown"
 
 def getNeworkArchitectureAndTypeFromName(networkName):
     if "Simple" in networkName:
         if "2" in networkName:
-            return "SIMPLEARCHITECTURE", NetworkTypes.SimpleCNN_2
+            return "SimpleCNN", NetworkTypes.SimpleCNN_2
         if "4" in networkName:
-            return "SIMPLEARCHITECTURE", NetworkTypes.SimpleCNN_4
+            return "SimpleCNN", NetworkTypes.SimpleCNN_4
         if "8" in networkName:
-            return "SIMPLEARCHITECTURE", NetworkTypes.SimpleCNN_8
+            return "SimpleCNN", NetworkTypes.SimpleCNN_8
         if "16" in networkName:
-            return "SIMPLEARCHITECTURE", NetworkTypes.SimpleCNN_16
+            return "SimpleCNN", NetworkTypes.SimpleCNN_16
     else:
         return AiModels.UNET_2D_SINGLE, NetworkTypes.UNET
 
 def getInputFields(name):
     sections = name[name.find("IN"):].split("_")
     model_fields = ['temp', 'srfhgt', 'salin', 'u-vel.', 'v-vel.']
-    obs_fields = ['sst', 'sss', 'ssh']
+    obs_fields = ['sst', 'sss']
 
     if "No-STD" in sections[1]:
         var_fields = []
     else:
         var_fields = ['tem', 'sal', 'ssh', 'mdt']
     return model_fields, obs_fields, var_fields
+
+def getInputVarFields(name):
+    sections = name[name.find("IN"):].split("_")
+    if "No-STD" in sections[1]:
+        var_fields = []
+    else:
+        var_fields = ['tem', 'sal', 'ssh', 'mdt']
+    return var_fields
 
 def getInputFieldsTxt(name):
     sections = name[name.find("IN"):].split("_")
