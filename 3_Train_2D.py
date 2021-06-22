@@ -131,18 +131,18 @@ if __name__ == '__main__':
     N = 5  # How many networks we want to run for each experiment
 
     # ========== Testing Network architecture =================
-    print(" --------------- Testing different architectures -------------------")
-    network_types = [NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
-    network_types_names = ["SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
+    # print(" --------------- Testing different architectures -------------------")
+    # network_types = [NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
+    # network_types_names = ["SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
 
-    local_name = orig_name.replace("OUTPUT", "OUT_SRFHGT")
-    for i in range(N):
-        run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
-        for i, net_type_id in enumerate(network_types):
-            config[TrainingParams.config_name] = run_name.replace("NETWORK", F"NET_{network_types_names[i]}")
-            print(config[TrainingParams.config_name])
-            config[ProjTrainingParams.network_type] = net_type_id
-            doTraining(config)
+    # local_name = orig_name.replace("OUTPUT", "OUT_SRFHGT")
+    # for i in range(N):
+    #     run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
+    #     for i, net_type_id in enumerate(network_types):
+    #         config[TrainingParams.config_name] = run_name.replace("NETWORK", F"NET_{network_types_names[i]}")
+    #         print(config[TrainingParams.config_name])
+    #         config[ProjTrainingParams.network_type] = net_type_id
+    #         doTraining(config)
 
     # ========== Changing output variable =================
     print(" --------------- Testing output variables -------------------")

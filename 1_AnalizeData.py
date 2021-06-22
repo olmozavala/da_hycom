@@ -14,6 +14,7 @@ from config.PreprocConfig import get_preproc_config
 from preproc.UtilsDates import get_day_of_year_from_month_and_day
 from sklearn.metrics import mean_squared_error
 import matplotlib.pyplot as plt
+from netCDF4 import Dataset
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -362,6 +363,31 @@ def visualizeBackgroundIncrementAnalaysis():
 
 if __name__ == '__main__':
     # main()
-
-    visualizeBackgroundIncrementAnalaysis()
+    # visualizeBackgroundIncrementAnalaysis()
     print("Done!")
+
+    input_folder = '/data/COAPS_nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES'
+    all_files = [x for x in os.listdir(input_folder) if x.find("obs") != -1]
+    all_files.sort()
+
+    test_file = all_files[0]
+    ds = Dataset(join(input_folder, test_file), "r", format="NETCDF4")
+    all_vars = ds.variables.keys()
+
+    print(F"All fields:{all_vars}")
+    for c_var_name in all_vars:
+        c_field = ds[c_var_name]
+        print(F"Working with field:{c_var_name} with shape= {c_field[:].shape}")
+        if len(c_field.shape) == 2:
+            plt.imshow(np.flip(np.flip(c_field[:]),axis=1))
+        elif len(c_field.shape) == 1:
+            plt.scatter(range(len(c_field[:])),c_field[:])
+        else:
+            print(F"This field has {len(c_field.shape)} dimensions.")
+
+
+        plt.title(c_var_name)
+        plt.show()
+        x = 1
+
+

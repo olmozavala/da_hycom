@@ -1,29 +1,26 @@
 import os
 from io_project.read_utils import generateXandY, normalizeData
 
-from numpy.distutils.system_info import flame_info
 from tensorflow.keras.utils import plot_model
-from tensorflow.keras.layers import LeakyReLU
 from inout.io_netcdf import read_netcdf
-from os.path import join, exists
+from os.path import join
 import numpy as np
-import numpy.ma as ma
 import pandas as pd
 import time
-import matplotlib.pyplot as plt
 
 from img_viz.eoa_viz import EOAImageVisualizer
 from config.MainConfig import get_prediction_params
 from constants_proj.AI_proj_params import PredictionParams, ProjTrainingParams, PreprocParams
 from models.modelSelector import select_2d_model
 from models_proj.models import *
-from img_viz.constants import PlotMode
-from constants.AI_params import TrainingParams, ModelParams, AiModels
+from constants.AI_params import TrainingParams, ModelParams
 from img_viz.common import create_folder
 
 from sklearn.metrics import mean_squared_error
 
-from ParallelUtils.NamesManipulation import *
+from ExtraUtils.NamesManipulation import *
+from eoas_utils.VizUtilsProj import chooseCMAP
+import cmocean
 
 def denormalizeData(input, fields, data_type, norm_type):
     output = np.zeros(input.shape)
@@ -55,7 +52,6 @@ def verifyBoundaries(start_col, cols, tot_cols):
         donecol = True
     return start_col, donecol
 
-
 def main():
 
     config = get_prediction_params()
@@ -63,8 +59,8 @@ def main():
     # test_model(config)
 
     # -------- For all summary model testing --------------
-    # summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
-    summary_file = "/home/data/MURI/output/SUMMARY/summary.csv"
+    summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
+    # summary_file = "/home/data/MURI/output/SUMMARY/summary.csv"
     df = pd.read_csv(summary_file)
     for model_id in range(len(df)):
         model = df.iloc[model_id]
@@ -150,6 +146,11 @@ def test_model(config):
     else:
         input_fields_std = []
 
+    cmap_out = chooseCMAP(output_fields)
+    cmap_model = chooseCMAP(field_names_model)
+    cmap_obs = chooseCMAP(field_names_obs)
+    cmap_std = chooseCMAP(field_names_std)
+
     tot_rows = 891
     tot_cols = 1401
 
@@ -162,6 +163,9 @@ def test_model(config):
         # Find current and next date
         year = int(c_file.split('_')[1])
         day_of_year = int(c_file.split('_')[2].split('.')[0])
+
+        if day_of_year != 5:
+            continue
 
         model_file = join(input_folder, F'model_{year}_{day_of_year:03d}.nc')
         inc_file = join(input_folder,F'increment_{year}_{day_of_year:03d}.nc')
@@ -198,6 +202,7 @@ def test_model(config):
 
                 # ******************* Replacing nan values *********
                 # We set a value of 0.5 on the land. Trying a new loss function that do not takes into account land
+                input_data_nans = np.isnan(input_data)
                 input_data = np.nan_to_num(input_data, nan=0)
                 y_data = np.nan_to_num(y_data, nan=-0.5)
 
@@ -246,6 +251,7 @@ def test_model(config):
                 denorm_input = denormalizeData(input_data, field_names_model+field_names_obs+field_names_std, input_types, norm_type)
 
                 # Recover the original land areas, they are lost after denormalization
+                denorm_input[input_data_nans] = np.nan
                 denorm_y[land_indexes] = np.nan
 
                 # Remove the 'extra dimension'
@@ -254,7 +260,8 @@ def test_model(config):
                 whole_cnn[start_row:start_row+rows, start_col:start_col+cols] = denorm_cnn_output# Add the the 'whole prediction'
                 whole_y[start_row:start_row+rows, start_col:start_col+cols] = denorm_y # Add the the 'whole prediction'
 
-                if np.random.random() > .99: # Plot 1% of the times
+                # if np.random.random() > .99: # Plot 1% of the times
+                if True: # Plot 1% of the times
                     if len(denorm_cnn_output.shape) == 2: # In this case we only had one output and we need to make it 'array' to plot
                         denorm_cnn_output = np.expand_dims(denorm_cnn_output, axis=2)
                         denorm_y = np.expand_dims(denorm_y, axis=2)
@@ -277,6 +284,7 @@ def test_model(config):
                                                           [F"out_inc_{x}" for x in output_fields] +
                                                           [F"cnn_{x}" for x in output_fields],
                                                 file_name=F"Input_and_CNN_{c_file}_{start_row:03d}_{start_col:03d}",
+                                                cmap=cmap_model+cmap_obs+cmap_std+cmap_out+cmap_out,
                                                 rot_90=True,
                                                 cols_per_row=len(field_names_model),
                                                 title=F"Input data: {field_names_model} and obs {field_names_obs}, increment {output_fields}, cnn {output_fields}")
@@ -293,10 +301,13 @@ def test_model(config):
 
                     # ================== Displays CNN and TSIS with RMSE ================
                     viz_obj.output_folder = join(output_imgs_folder,'JoinedErrrorCNN')
+                    cmap = chooseCMAP(output_fields)
+                    error_cmap = cmocean.cm.diff
                     viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_cnn_output.swapaxes(0,2), denorm_y.swapaxes(0,2), error), axis=0),
                                                  var_names=[F"CNN INC {x}" for x in output_fields] + [F"TSIS INC {x}" for x in output_fields] + [F'RMSE {c_rmse_cnn:0.4f}' for c_rmse_cnn in rmse_cnn],
                                                 file_name=F"AllError_{c_file}_{start_row:03d}_{start_col:03d}",
                                                 rot_90=True,
+                                                cmap=cmap+cmap+[error_cmap],
                                                 cols_per_row=len(output_fields),
                                                 title=F"{output_fields} RMSE: {np.mean(rmse_cnn):0.5f}")
 
@@ -306,11 +317,11 @@ def test_model(config):
             # Row for
 
         # ======= Plots whole output with RMSE
-        mincbar = np.nanmin(whole_y)
-        maxcbar = np.nanmax(whole_y)
+        mincbar = np.nanmin(whole_y)/2
+        maxcbar = np.nanmax(whole_y)/2
         error = whole_y - whole_cnn
-        mincbarerror = np.nanmin(error)
-        maxcbarerror = np.nanmax(error)
+        mincbarerror = np.nanmin(error)/2
+        maxcbarerror = np.nanmax(error)/2
         no_zero_ids = np.count_nonzero(whole_cnn)
 
         rmse_cnn = np.sqrt( np.nansum( (whole_y - whole_cnn)**2 )/no_zero_ids)
@@ -320,10 +331,10 @@ def test_model(config):
 
         if np.random.random() > .9 or day_of_year == 353: # Plot 10% of the times
             viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
-                                         # mincbar=mincbar + mincbar + mincbarerror,
-                                         # maxcbar=maxcbar + maxcbar + maxcbarerror)
-                                            mincbar=[-5, -5, -1],
-                                            maxcbar=[10, 10, 1])
+                                         mincbar=mincbar + mincbar + mincbarerror,
+                                         maxcbar=maxcbar + maxcbar + maxcbarerror)
+                                            # mincbar=[-5, -5, -1],
+                                            # maxcbar=[10, 10, 1])
 
             # ================== Displays CNN and TSIS with RMSE ================
             viz_obj.output_folder = join(output_imgs_folder,'WholeOutput_CNN_TSIS')
@@ -332,17 +343,18 @@ def test_model(config):
                                         file_name=F"WholeOutput_CNN_TSIS_{c_file}",
                                         rot_90=False,
                                         cols_per_row=3,
+                                        cmap=cmocean.cm.algae,
                                         title=F"{output_fields} RMSE: {np.mean(rmse_cnn):0.5f}")
 
-    print("DONE ALL FILES!!!!!!!!!!!!!")
-    dic_summary = {
-        "File": model_files,
-        "rmse": all_whole_rmse,
-        "times mean": all_whole_mean_times,
-        "times sum": all_whole_sum_times,
-    }
-    df = pd.DataFrame.from_dict(dic_summary)
-    df.to_csv(join(output_imgs_folder, "RMSE_and_times.csv"))
+    # print("DONE ALL FILES!!!!!!!!!!!!!")
+    # dic_summary = {
+    #     "File": model_files,
+    #     "rmse": all_whole_rmse,
+    #     "times mean": all_whole_mean_times,
+    #     "times sum": all_whole_sum_times,
+    # }
+    # df = pd.DataFrame.from_dict(dic_summary)
+    # df.to_csv(join(output_imgs_folder, "RMSE_and_times.csv"))
         # ====================================================================
                 # ================= Individual figures for error, cnn and expected ================
                 # ====================================================================
@@ -377,7 +389,6 @@ def test_model(config):
                 #                             file_name=F"Only_CNN_{c_file}_{start_row:03d}_{start_col:03d}",
                 #                             rot_90=True,
                 #                             title=F"CNN {output_fields}")
-
 
 
 if __name__ == '__main__':

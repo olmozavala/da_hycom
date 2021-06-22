@@ -80,7 +80,7 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
                 start_col = np.random.randint(0, 1401 - cols)
 
                 try:
-                    perc_ocean = 0.99
+                    perc_ocean = 0.99  #0.99
                     if config[ModelParams.MODEL] == AiModels.UNET_2D_MULTISTREAMS:
                         input_data, y_data = generateXandYMulti(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
                                                                 field_names, obs_field_names, var_field_names, output_fields,

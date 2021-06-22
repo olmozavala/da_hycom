@@ -40,6 +40,7 @@ def getInputFields(name):
     sections = name[name.find("IN"):].split("_")
     model_fields = ['temp', 'srfhgt', 'salin', 'u-vel.', 'v-vel.']
     obs_fields = ['sst', 'sss']
+    # obs_fields = ['sst', 'sss', 'ssh']
 
     if "No-STD" in sections[1]:
         var_fields = []
@@ -57,7 +58,12 @@ def getInputVarFields(name):
 
 def getInputFieldsTxt(name):
     sections = name[name.find("IN"):].split("_")
-    return sections[1]
+    in_fields = sections[1]
+    if "WSSH" in name:
+        in_fields += ", SSH"
+    if "LATLON" in name:
+        in_fields += ", LATLON"
+    return in_fields
 
 def getOutputFields(name):
     # ProjTrainingParams.output_fields: ['temp', 'srfhgt', 'salin', 'u-vel.', 'v-vel.']

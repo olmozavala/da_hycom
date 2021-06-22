@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import os
 from os.path import join
 import pandas as pd
-from ParallelUtils.NamesManipulation import *
+from ExtraUtils.NamesManipulation import *
 
 imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/Prediction/imgs"
 
@@ -10,7 +10,7 @@ all_folders = os.listdir(imgs_prediction_folder)
 all_folders.sort()
 
 for c_model in all_folders:
-    c_file = join(imgs_prediction_folder, c_model, "RMSE_and_times.csv")
+    c_file = join(imgs_prediction_folder, c_model, "Global_RMSE_and_times.csv")
     try:
         network = getNetworkTypeTxt(c_model)
         output_field = getOutputFieldsTxt(c_model)

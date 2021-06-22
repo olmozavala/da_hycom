@@ -1,7 +1,7 @@
 from enum import Enum
 
-MAX_MODEL = {'temp': 35, 'srfhgt': 10, 'salin': 40, 'u-vel.': 3, 'v-vel.': 3, 'LAT': 90 , 'LON': 180}
-MIN_MODEL = {'temp': 10, 'srfhgt': -10, 'salin': 0, 'u-vel.':-3, 'v-vel.':-3, 'LAT':-90 , 'LON':-180}
+MAX_MODEL = {'temp': 35, 'srfhgt': 10, 'salin': 40, 'u-vel.': 3, 'v-vel.': 3, 'LAT': 32, 'LON':-56}
+MIN_MODEL = {'temp': 10, 'srfhgt': -10, 'salin': 0, 'u-vel.':-3, 'v-vel.':-3, 'LAT': 7 , 'LON': -98}
 
 MIN_STDVAR = {'tem': 0.0, 'sal': 0.0, 'ssh': 0.0, 'mdt':-0.58}
 MAX_STDVAR = {'tem': 6.0, 'sal': 4.7, 'ssh': 0.3, 'mdt': 0.22}

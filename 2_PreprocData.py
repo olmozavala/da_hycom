@@ -1,5 +1,5 @@
 from info.info_hycom import read_field_names
-from inout.io_hycom import read_hycom_output
+from hycom.io import read_hycom_fields, read_field_names, read_hycom_coords
 from inout.io_netcdf import read_netcdf
 from img_viz.eoa_viz import EOAImageVisualizer
 from img_viz.constants import PlotMode
@@ -14,7 +14,20 @@ from constants_proj.AI_proj_params import PreprocParams, ParallelParams
 from config.PreprocConfig import get_preproc_config
 
 # Not sure how to move this inside the function
-NUM_PROC = 10
+NUM_PROC = 15
+
+_minlat = 7.00250
+_minlon = -98.08
+_maxlat = 31.9267
+_maxlon = -56.08
+
+# Here we identify lat and lons before hand. TODO improve this making it local to functions
+coords_file = "/data/HYCOM/DA_HYCOM_TSIS/preproc/coords/regional.grid.a"
+# coord_fields = [ 'plon','plat','qlon','qlat','ulon','ulat','vlon','vlat']
+coord_fields = ['plon','plat']
+hycom_coords = read_hycom_coords(coords_file, coord_fields)
+_lats = hycom_coords['plat'][:,0]
+_lons = hycom_coords['plon'][0,:]
 
 def preproc_data(proc_id):
     """
@@ -36,6 +49,8 @@ def preproc_data(proc_id):
     layers = config[PreprocParams.layers_to_plot]
     img_viz = EOAImageVisualizer(output_folder=output_folder, disp_images=False)
 
+
+
     # These are the data assimilated files
     for c_year in YEARS:
         for c_month in MONTHS:
@@ -47,7 +62,7 @@ def preproc_data(proc_id):
 
             # This for is fixed to be able to run in parallel
             for c_day_of_month, c_day_of_year in enumerate(days_of_year):
-                if (c_day_of_month % NUM_PROC) == (proc_id - 1):
+                if (c_day_of_month % NUM_PROC) == proc_id:
                     re_increment = F'incupd.{c_year}_{c_day_of_year:03d}\S*.a'
                     re_model = F'archv.{c_year}_{c_day_of_year:03d}\S*.a'
                     re_obs = F'tsis_obs_ias_{c_year}{c_month:02d}{c_day_of_month+1:02d}\S*.nc'
@@ -55,10 +70,10 @@ def preproc_data(proc_id):
                     try:
                         da_file_idx = [i for i, file in enumerate(da_files) if re.search(re_increment, file) != None][0]
                         print(F" =============== Working with: {da_files[da_file_idx]} Proc_id={proc_id} ============= ")
-                        da_np_fields = read_hycom_output(da_paths[da_file_idx], fields, layers=layers)
+                        da_np_fields = read_hycom_fields(da_paths[da_file_idx], fields, layers=layers)
 
                         hycom_file_idx = [i for i, file in enumerate(hycom_files) if re.search(re_model, file) != None][0]
-                        hycom_np_fields = read_hycom_output(hycom_paths[hycom_file_idx], fields, layers=layers)
+                        hycom_np_fields = read_hycom_fields(hycom_paths[hycom_file_idx], fields, layers=layers)
 
                         # --------- Preprocessing Increment (TSIS) -------------
                         proc_increment_data(da_np_fields, hycom_np_fields, fields,
@@ -71,7 +86,7 @@ def preproc_data(proc_id):
                     try:
                         print(F" =============== Working with: {hycom_files[hycom_file_idx]} ============= ")
                         hycom_file_idx = [i for i, file in enumerate(hycom_files) if re.search(re_model, file) != None][0]
-                        hycom_np_fields = read_hycom_output(hycom_paths[hycom_file_idx], fields, layers=layers)
+                        hycom_np_fields = read_hycom_fields(hycom_paths[hycom_file_idx], fields, layers=layers)
                         # --------- Preprocessing HYCOM data -------------
                         proc_model_data(hycom_np_fields, fields, join(output_folder, F"model_{c_year}_{c_day_of_year:03d}.nc"))
                     except Exception as e:
@@ -103,8 +118,10 @@ def proc_increment_data(increment_fields, model_fields, field_names, file_name):
     rows = increment_fields[field_names[0]].shape[1]
     cols = increment_fields[field_names[0]].shape[2]
 
-    lats = np.linspace(-90, 90, rows)
-    lons = np.linspace(-180, 180, cols)
+    # lats = np.linspace(_minlat, _maxlat, rows)
+    # lons = np.linspace(_minlon, _maxlon, cols)
+    lats = _lats
+    lons = _lons
     for id_field, c_field in enumerate(field_names):
         # df_var = {c_field: (("lat", "lon"), increment_fields[c_field][0])}
         df_var = {c_field: (("lat", "lon"), (increment_fields[c_field][0] - model_fields[c_field][0]))}
@@ -117,7 +134,6 @@ def proc_increment_data(increment_fields, model_fields, field_names, file_name):
 
     preproc_increment_ds = addLatLon(preproc_increment_ds , lats, lons, rows, cols)
     preproc_increment_ds.to_netcdf(file_name)
-
 
 def addLatLon(ds, lats, lons, rows, cols):
     # Adding lat and lon as additional fields
@@ -135,8 +151,10 @@ def proc_model_data(np_fields, field_names, file_name):
     rows = np_fields[field_names[0]].shape[1]
     cols = np_fields[field_names[0]].shape[2]
 
-    lats = np.linspace(-90, 90, rows)
-    lons = np.linspace(-180, 180, cols)
+    # lats = np.linspace(_minlat, _maxlat, rows)
+    # lons = np.linspace(_minlon, _maxlon, cols)
+    lats = _lats
+    lons = _lons
     for id_field, c_field in enumerate(field_names):
         df_var = {c_field: (("lat", "lon"), np_fields[c_field][0])}
 

@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 import os
 from os.path import join
-from ParallelUtils.NamesManipulation import *
+from ExtraUtils.NamesManipulation import *
 from tensorflow.keras.utils import plot_model
 from img_viz.common import create_folder
 

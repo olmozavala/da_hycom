@@ -10,7 +10,7 @@ from constants.AI_params import TrainingParams, ModelParams
 from constants_proj.AI_proj_params import ProjTrainingParams
 from img_viz.common import create_folder
 
-from ParallelUtils.NamesManipulation import *
+from ExtraUtils.NamesManipulation import *
 
 
 # This code is used to generate a summary of the models
@@ -37,9 +37,6 @@ def buildDF(summary):
         "Path": [x[6] for x in summary],
     }
     return pd.DataFrame.from_dict(df)
-
-
-
 
 def fixNames(trained_models_folder):
     print("================ Fixing files names ========================")
@@ -123,67 +120,89 @@ if __name__ == '__main__':
     summary.to_csv(join(output_folder,"summary.csv"))
 
     # ========= Compare Network type ======
-    data_novar = summary[summary[IN] == "No-STD"]  # All novar data
-    data_novar_srfhgt = data_novar[data_novar[OUT] == "SRFHGT"]  # All srfhgt data
+    # data_novar = summary[summary[IN] == "No-STD"]  # All no STD data as input
+    # data_novar_srfhgt = data_novar[data_novar[OUT] == "SRFHGT"]  # Only SSH data
+    #
+    # names = []
+    # data = []
+    # fig, ax = plt.subplots(figsize=(10,6))
+    # for i, grp in enumerate(data_novar_srfhgt.groupby(NET)):
+    #     names.append(grp[0])
+    #     c_data = grp[1][LOSS].values
+    #     data.append(c_data)
+    #     plt.scatter(np.ones(len(c_data))*i, c_data, label=grp[0])
+    #
+    # plt.legend(loc="best")
+    # # bp = plt.boxplot(data, labels=names, patch_artist=True, meanline=True, showmeans=True)
+    # ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
+    # ax.set_xlabel("Network type")
+    # ax.set_ylabel("Validation Loss (MSE)")
+    # ax.set_title("Validation Loss by Network Type (SSH)")
+    # plt.savefig(join(output_folder,F"By_Network_Type_Scatter.png"))
+    # plt.show()
 
-    names = []
-    data = []
+    # ========= Compare By network inputs ======
     fig, ax = plt.subplots(figsize=(10,6))
-    for i, grp in enumerate(data_novar_srfhgt.groupby(NET)):
-        names.append(grp[0])
-        c_data = grp[1][LOSS].values
-        data.append(c_data)
-        plt.scatter(np.ones(len(c_data))*i, c_data, label=grp[0])
+    for j, major_grp in enumerate(summary.groupby(OUT)):
+        out_name = major_grp[0]
+        data_out = summary[summary[OUT] == out_name]  # All srfhgt data
+        names = []
+        data = []
+        for i, grp in enumerate(data_out.groupby(IN)):
+            names.append(grp[0])
+            c_data = grp[1][LOSS].values
+            data.append(c_data)
+            # plt.scatter(np.ones(len(c_data))*i, c_data, label=grp[0])
 
-    plt.legend(loc="best")
+        # plt.legend(loc="best")
+        bp = plt.boxplot(data, labels=names, patch_artist=True, meanline=True, showmeans=True)
+        ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
+        ax.set_xlabel("Input variables")
+        ax.set_ylabel("Validation Loss (MSE)")
+        plt.title(F"Validation Loss by output: {out_name}")
+        plt.savefig(join(output_folder,F"{out_name}_out.png"))
+        plt.show()
+
+    # # ========= Compare by Output field ======
+    # data_novar_unet = data_novar[data_novar[NET] == "UNET"]  # All srfhgt data
+    #
+    # names = []
+    # data = []
+    # fig, ax = plt.subplots(figsize=(10,6))
+    # for i, grp in enumerate(data_novar_unet.groupby(OUT)):
+    #     names.append(grp[0])
+    #     c_data = grp[1][LOSS].values
+    #     data.append(c_data)
+    #     # plt.scatter(np.ones(len(c_data))*i, c_data, label=grp[0])
+    #
+    # # plt.legend(loc='best')
     # bp = plt.boxplot(data, labels=names, patch_artist=True, meanline=True, showmeans=True)
-    ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
-    ax.set_xlabel("Network type")
-    ax.set_ylabel("Validation Loss (MSE)")
-    ax.set_title("Validation Loss by Network Type (SSH)")
-    plt.savefig(join(output_folder,F"By_Network_Type_Scatter.png"))
+    # ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
+    # ax.set_xlabel("Output field")
+    # ax.set_ylabel("Validation Loss (MSE)")
+    # ax.set_title("Validation Loss by output field (UNET)")
+    # plt.savefig(join(output_folder,F"By_OutField_Type.png"))
     # plt.show()
-
-    # ========= Compare by Output field ======
-    data_novar_unet = data_novar[data_novar[NET] == "UNET"]  # All srfhgt data
-
-    names = []
-    data = []
-    fig, ax = plt.subplots(figsize=(10,6))
-    for i, grp in enumerate(data_novar_unet.groupby(OUT)):
-        names.append(grp[0])
-        c_data = grp[1][LOSS].values
-        data.append(c_data)
-        # plt.scatter(np.ones(len(c_data))*i, c_data, label=grp[0])
-
-    # plt.legend(loc='best')
-    bp = plt.boxplot(data, labels=names, patch_artist=True, meanline=True, showmeans=True)
-    ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
-    ax.set_xlabel("Output field")
-    ax.set_ylabel("Validation Loss (MSE)")
-    ax.set_title("Validation Loss by output field (UNET)")
-    plt.savefig(join(output_folder,F"By_OutField_Type.png"))
-    # plt.show()
+    # #
+    # # # ========= Var vs no Var======
+    # names = []
+    # data = []
+    # fig, ax = plt.subplots(figsize=(10,6))
+    # for i, grp in enumerate(summary.groupby(IN)):
+    #     if grp[0].find("Yes") != -1:
+    #         names.append(F"{grp[0]} (SST, SSS, SSH)")
+    #     else:
+    #         names.append(F"{grp[0]} ")
+    #     data.append(grp[1][LOSS].values)
+    #     plt.scatter(np.ones(len(grp[1]))*i, grp[1][LOSS].values, label=grp[0])
     #
-    # # ========= Var vs no Var======
-    names = []
-    data = []
-    fig, ax = plt.subplots(figsize=(10,6))
-    for i, grp in enumerate(summary.groupby(IN)):
-        if grp[0].find("Yes") != -1:
-            names.append(F"{grp[0]} (SST, SSS, SSH)")
-        else:
-            names.append(F"{grp[0]} ")
-        data.append(grp[1][LOSS].values)
-        plt.scatter(np.ones(len(grp[1]))*i, grp[1][LOSS].values, label=grp[0])
-
-    plt.legend(loc="center")
-    bp = plt.boxplot(data, labels=names, patch_artist=True, meanline=True, showmeans=True)
-    ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
-    ax.set_xlabel("Input field")
-    ax.set_ylabel("Validation Loss (MSE)")
-    ax.set_title("Validation Loss by input fields")
-    plt.savefig(join(output_folder,F"By_InputField_Type_Scatter.png"))
+    # plt.legend(loc="center")
+    # # bp = plt.boxplot(data, labels=names, patch_artist=True, meanline=True, showmeans=True)
+    # ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
+    # ax.set_xlabel("Input field")
+    # ax.set_ylabel("Validation Loss (MSE)")
+    # ax.set_title("Validation Loss by input fields")
+    # plt.savefig(join(output_folder,F"By_InputField_Type_Scatter.png"))
     # plt.show()
-    #
+
     print("Done!")
