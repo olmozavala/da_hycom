@@ -203,10 +203,11 @@ def test_model(config):
             denorm_y = np.expand_dims(denorm_y, axis=2)
 
         # Compute RMSE
-        rmse_cnn = np.zeros(len(output_fields))
-        for i in range(len(output_fields)):
-            ocean_indexes = np.logical_not(np.isnan(denorm_y[:,:,i]))
-            rmse_cnn[i] = np.sqrt(mean_squared_error(denorm_cnn_output[:,:,i][ocean_indexes], denorm_y[:,:,i][ocean_indexes]))
+        # rmse_cnn = np.zeros(len(output_fields))
+        # for i in range(len(output_fields)):
+        #     ocean_indexes = np.logical_not(np.isnan(denorm_y[:,:,i]))
+        #     rmse_cnn[i] = np.sqrt(mean_squared_error(denorm_cnn_output[:,:,i][ocean_indexes], denorm_y[:,:,i][ocean_indexes]))
+
 
         # ================== DISPLAYS ALL INPUTS AND OUTPUTS DENORMALIZED ===================
         # Adding back mask to all the input variables
@@ -220,7 +221,12 @@ def test_model(config):
         maxcbarerror = np.nanmax(error)
         no_zero_ids = np.count_nonzero(whole_cnn)
 
+        if output_fields[0] == 'srfhgt': # This should only be for SSH to adjust the units
+            whole_cnn /= 9.81
+            whole_y = np.array(whole_y)/9.81
+
         rmse_cnn = np.sqrt( np.nansum( (whole_y - whole_cnn)**2 )/no_zero_ids)
+
         all_whole_rmse.append(rmse_cnn)
         all_whole_mean_times.append(np.mean(np.array(this_file_times)))
         all_whole_sum_times.append(np.sum(np.array(this_file_times)))
@@ -249,29 +255,33 @@ def test_model(config):
             viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
                                          # mincbar=mincbar + mincbar + mincbarerror,
                                          # maxcbar=maxcbar + maxcbar + maxcbarerror)
-                                         mincbar=[minmax[0], minmax[0], max(minmax[0],-1)],
-                                         maxcbar=[minmax[1], minmax[1], min(minmax[1],1)])
+                                         # mincbar=[minmax[0], minmax[0], max(minmax[0],-1)],
+                                         # maxcbar=[minmax[1], minmax[1], min(minmax[1],1)])
+                                        mincbar=[minmax[0], minmax[0], -1],
+                                        maxcbar=[minmax[1], minmax[1], 1])
 
             # ================== Displays CNN and TSIS with RMSE ================
             error_cmap = cmocean.cm.diff
             viz_obj.output_folder = join(output_imgs_folder,'WholeOutput_CNN_TSIS')
             viz_obj.plot_2d_data_np_raw([np.flip(whole_cnn, axis=0), np.flip(whole_y, axis=0), np.flip(error, axis=0)],
-                                        var_names=[F"CNN INC {x}" for x in output_fields] + [F"TSIS INC {x}" for x in output_fields] + [F'TSIS - CNN (Mean RMSE {rmse_cnn:0.4f})'],
+                                        # var_names=[F"CNN INC {x}" for x in output_fields] + [F"TSIS INC {x}" for x in output_fields] + [F'TSIS - CNN (Mean RMSE {rmse_cnn:0.4f} m)'],
+                                        var_names=[F"CNN increment SSH" for x in output_fields] + [F"TSIS increment SSH" for x in output_fields] + [F'TSIS - CNN \n (Mean RMSE {rmse_cnn:0.4f} m)'],
                                         file_name=F"Global_WholeOutput_CNN_TSIS_{c_file}",
                                         rot_90=False,
                                         cmap=cmap_out+cmap_out+[error_cmap],
                                         cols_per_row=3,
-                                        title=F"{output_fields} RMSE: {np.mean(rmse_cnn):0.5f}")
+                                        # title=F"{output_fields[0]} RMSE: {np.mean(rmse_cnn):0.5f} m.")
+                                        title=F"SSH RMSE: {np.mean(rmse_cnn):0.5f} m.")
 
-    print("DONE ALL FILES!!!!!!!!!!!!!")
-    # dic_summary = {
-    #     "File": model_files,
-    #     "rmse": all_whole_rmse,
-    #     "times mean": all_whole_mean_times,
-    #     "times sum": all_whole_sum_times,
-    # }
-    # df = pd.DataFrame.from_dict(dic_summary)
-    # df.to_csv(join(output_imgs_folder, "Global_RMSE_and_times.csv"))
+            print("DONE ALL FILES!!!!!!!!!!!!!")
+    dic_summary = {
+        "File": model_files,
+        "rmse": all_whole_rmse,
+        "times mean": all_whole_mean_times,
+        "times sum": all_whole_sum_times,
+    }
+    df = pd.DataFrame.from_dict(dic_summary)
+    df.to_csv(join(output_imgs_folder, "Global_RMSE_and_times.csv"))
 
 
 def denormalizeData(input, fields, data_type, norm_type):

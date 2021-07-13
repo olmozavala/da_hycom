@@ -7,12 +7,15 @@ _output_folder = '/data/HYCOM/DA_HYCOM_TSIS/'  # Where to save everything
 
 def get_preproc_config():
     model_config = {
-        PreprocParams.input_folder_hycom: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies',
-        PreprocParams.input_folder_tsis: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies/incup',
+        # PreprocParams.input_folder_hycom: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies',
+        PreprocParams.input_folder_hycom: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_01.0/data',
+        # PreprocParams.input_folder_tsis: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies/incup',
+        PreprocParams.input_folder_tsis: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_01.0/incup',
         PreprocParams.input_folder_obs: '/data/COAPS_nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES',
-        PreprocParams.output_folder: join(_output_folder, 'preproc'),
+        PreprocParams.output_folder: join(_output_folder, 'preproctest'),
         PreprocParams.imgs_output_folder: join(_output_folder, 'preproc', 'imgs'),
         PreprocParams.YEARS: [2009],
+        # PreprocParams.MONTHS: range(1, 13),
         PreprocParams.MONTHS: range(1, 13),
         # There MUST be the same number of field names between the two because there is a comparison between them.
         PreprocParams.fields_names: ['temp', 'srfhgt', 'salin',  'u-vel.', 'v-vel.'], #'thknss',

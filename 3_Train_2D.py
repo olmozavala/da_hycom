@@ -148,11 +148,15 @@ if __name__ == '__main__':
     print(" --------------- Testing output variables -------------------")
     # In this case it is always a UNET
     local_name = orig_name.replace("NETWORK", "NET_UNET")
-    output_fields = ['srfhgt', 'temp', 'salin', 'u-vel.', 'v-vel.']
+    # output_fields = ['srfhgt', 'temp', 'salin', 'u-vel.', 'v-vel.']
+    output_fields = ['srfhgt']
     config[ProjTrainingParams.network_type] = NetworkTypes.UNET
+    input_size = config[ModelParams.INPUT_SIZE]
     for out_field in output_fields:
         for i in range(N):
             run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
+            run_name = run_name.replace("ROWS", str(input_size[0]))
+            run_name = run_name.replace("COLS", str(input_size[1]))
             config[TrainingParams.config_name] = run_name.replace("OUTPUT", F"OUT_{out_field.upper()}")
             config[ProjTrainingParams.output_fields] = [out_field]
             doTraining(config)

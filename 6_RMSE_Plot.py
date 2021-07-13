@@ -16,14 +16,19 @@ for c_model in all_folders:
         output_field = getOutputFieldsTxt(c_model)
         if os.path.exists(c_file):
             df = pd.read_csv(c_file)
-            rms_mean = df["rmse"]
+            rms_mean = df["rmse"]/9.81
             year_day = [int(x.split("_")[2].split(".")[0])for x in df["File"]]
             plt.figure(figsize=(10,5))
             plt.scatter(year_day, rms_mean)
             plt.axvline(x=year_day[65], c='g')
             plt.axvline(x=year_day[65+9], c='r')
-            plt.title(F"RMSE Training, Validation, Test: ({rms_mean.mean():0.3f}, {rms_mean.iloc[65:65+9].mean():0.3f}, {rms_mean.iloc[74:74+9].mean():0.3f}) \n {network} predicted {output_field}")
+            plt.ylabel('Meters')
+            plt.xlabel('Day of the year')
+            # plt.title(F"RMSE Training, Validation, Test: ({rms_mean.mean():0.3f}, {rms_mean.iloc[65:65+9].mean():0.3f}, {rms_mean.iloc[74:74+9].mean():0.3f}) \n {network} predicted {output_field}")
+            plt.title(F"RMSE of SSH prediction by dataset: \n training: {rms_mean.mean():0.3f}  validation:{rms_mean.iloc[65:65+9].mean():0.3f} test:{rms_mean.iloc[74:74+9].mean():0.3f}")
+            print(join(imgs_prediction_folder, c_model, "RMSE.png"))
             plt.savefig(join(imgs_prediction_folder, c_model, "RMSE.png") ,bbox_inches='tight')
-            plt.show()
+            # plt.show()
+            plt.close()
     except Exception as e:
         print(F"Failed for {c_file} {e}")
