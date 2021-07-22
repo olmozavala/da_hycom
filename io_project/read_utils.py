@@ -40,13 +40,13 @@ def get_da_tot_days(input_folder, years, pies):
     corresponding_paths_np = corresponding_paths_np[sorted_idxs]
     return filtered_files_np, corresponding_paths_np
 
-def get_hycom_file_name(input_folder, year, month):
+def get_hycom_file_name(input_folder, year, month, day_idx=1):
     """
     This function obtains the complete path of the files for the specified month and year, stored by Dmitry with DA
     :param input_folder:
     :param year:
     :param month:
-    :param pies:
+    :param day_idx: Indicates the position of the day of the year in the split by '_' of the file name
     :return: str array [file names], str array [file paths]
     """
     _, days_of_year = get_days_from_month(month)
@@ -54,7 +54,7 @@ def get_hycom_file_name(input_folder, year, month):
     folder = input_folder
     all_files = os.listdir(folder)
     all_files = [x for x in all_files  if isfile(join(input_folder, x))]
-    selected_files = [file for file in all_files if int(file.split('_')[1]) in days_of_year]
+    selected_files = [file for file in all_files if int(file.split('_')[day_idx]) in days_of_year]
     selected_files.sort()
     return selected_files, [join(folder,c_file) for c_file in selected_files]
 
@@ -84,7 +84,8 @@ def get_obs_file_names(input_folder, year, month):
     # folder = join(input_folder, F'{pies_txt}')
     folder = input_folder
     all_files = os.listdir(folder)
-    all_files = [file for file in all_files if file.find('tsis_obs_ias') != -1] # Avoid additiona files
+    # all_files = [file for file in all_files if file.find('tsis_obs_ias') != -1] # Avoid additiona files
+    all_files = [file for file in all_files if file.find('tsis_obs_gomb4') != -1] # Avoid additiona files
     selected_files = [file for file in all_files if (file.split('_')[3][0:6]) == F'{year}{month:02d}']
     selected_files.sort()
     return selected_files, [join(folder, c_file) for c_file in selected_files]
