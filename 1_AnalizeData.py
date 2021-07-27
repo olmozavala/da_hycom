@@ -119,10 +119,19 @@ def plot_raw_data_new(proc_id):
                         # mse_obs_vs_hycom = mse(obs_np_c_field, model_state_np_c_field[0])
                         # mse_obs_vs_da = mse(obs_np_c_field, increment_np_c_field[0])
 
+                        maxcbar = np.nan
+                        mincbar = np.nan
                         if c_field_name == "thknss":
                             divide = 9806
                             model_state_np_c_field = model_state_np_c_field/divide
                             increment_np_c_field = increment_np_c_field/divide
+                        elif c_field_name == "temp":
+                            mincbar = [np.nan, -.05]
+                            maxcbar = [np.nan, .05]
+                        elif c_field_name == "salin":
+                            mincbar = [np.nan, -0.01]
+                            maxcbar = [np.nan, 0.01]
+
                         if c_field_name == "srfhgt":
                             inc = increment_np_c_field
                         else:
@@ -135,7 +144,7 @@ def plot_raw_data_new(proc_id):
                             # img_viz.plot_3d_data_np([model_state_np_c_field, increment_np_c_field],
                                                     var_names=['HYCOM', 'Increment (TSIS)'],
                                                     title=title, file_name_prefix=F'ModelAndIncrement_{c_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
-                                                    flip_data=True, plot_mode=plot_modes[idx_field])
+                                                    flip_data=True, plot_mode=plot_modes[idx_field], maxcbar=maxcbar, mincbar=mincbar)
                         except Exception as e:
                             print(F"Failed for field: {c_field_name}: {e}")
 

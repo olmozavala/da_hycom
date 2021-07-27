@@ -1,13 +1,13 @@
 from datetime import datetime
 
 from config.MainConfig import get_training_2d
-# from AI.data_generation.Generators2D import data_gen_hycomtsis
-from AI.data_generation.GeneratorPreproc import data_gen_from_preproc
+from config.PreprocConfig import get_preproc_config
+from AI.data_generation.GeneratorRaw3D import data_gen_from_preproc
 
-from constants_proj.AI_proj_params import ProjTrainingParams, ParallelParams, NetworkTypes
+from constants_proj.AI_proj_params import ProjTrainingParams, ParallelParams, NetworkTypes, PreprocParams
 import trainingutils as utilsNN
 # import models.modelBuilder3D as model_builder
-from models.modelSelector import select_2d_model
+from models.modelSelector import select_2d_model, select_3d_model
 from models_proj.models import *
 from img_viz.common import create_folder
 from io_project.read_utils import get_preproc_increment_files
@@ -21,13 +21,12 @@ from tensorflow.keras.utils import plot_model
 from tensorflow.keras.layers import LeakyReLU
 
 def doTraining(conf):
-    input_folder_preproc = config[ProjTrainingParams.input_folder_preproc]
-    # input_folder_obs = config[ProjTrainingParams.input_folder_obs]
-    years = config[ProjTrainingParams.YEARS]
+    preproc_config = get_preproc_config()
+    input_folder_increment =    preproc_config[PreprocParams.input_folder_tsis]
+
     fields = config[ProjTrainingParams.fields_names]
     fields_obs = config[ProjTrainingParams.fields_names_obs]
-    output_field = config[ProjTrainingParams.output_fields]
-    # day_to_predict = config[ProjTrainingParams.prediction_time]
+    output_fields = config[ProjTrainingParams.output_fields]
 
     output_folder = config[TrainingParams.output_folder]
     val_perc = config[TrainingParams.validation_percentage]
@@ -50,7 +49,9 @@ def doTraining(conf):
     create_folder(logs_folder)
 
     # Compute how many cases
-    files_to_read, paths_to_read = get_preproc_increment_files(input_folder_preproc)
+    all_increment_files = os.listdir(input_folder_increment)
+    files_to_read = np.array([x for x in all_increment_files if x.find(".a") != -1])
+    files_to_read.sort()
     tot_examples = len(files_to_read)
 
     # ================ Split definition =================
@@ -68,17 +69,8 @@ def doTraining(conf):
     model_name = F'{run_name}_{now}'
 
     # ******************* Selecting the model **********************
-    net_type = config[ProjTrainingParams.network_type]
-    if net_type == NetworkTypes.UNET or net_type == NetworkTypes.UNET_MultiStream:
-        model = select_2d_model(config, last_activation=None)
-    if net_type == NetworkTypes.SimpleCNN_2:
-        model = simpleCNN(config, nn_type="2d", hid_lay=2, out_lay=2)
-    if net_type == NetworkTypes.SimpleCNN_4:
-        model = simpleCNN(config, nn_type="2d", hid_lay=4, out_lay=2)
-    if net_type == NetworkTypes.SimpleCNN_8:
-        model = simpleCNN(config, nn_type="2d", hid_lay=8, out_lay=2)
-    if net_type == NetworkTypes.SimpleCNN_16:
-        model = simpleCNN(config, nn_type="2d", hid_lay=16, out_lay=2)
+    model = select_3d_model(config, last_activation=None, output_bands=len(output_fields))
+
 
     plot_model(model, to_file=join(output_folder,F'{model_name}.png'), show_shapes=True)
 
@@ -97,17 +89,14 @@ def doTraining(conf):
                                                                        logs_folder=logs_folder)
 
     print("Training ...")
-    # ----------- Using preprocessed data -------------------
-    generator_train = data_gen_from_preproc(input_folder_preproc, config, train_ids, fields, fields_obs, output_field)
-    generator_val = data_gen_from_preproc(input_folder_preproc, config, val_ids, fields, fields_obs, output_field)
-
-    # Decide which generator to use
-    data_augmentation = config[TrainingParams.data_augmentation]
+    # # ----------- Using preprocessed data -------------------
+    generator_train = data_gen_from_preproc(config, preproc_config, train_ids, fields, fields_obs, output_fields)
+    generator_val = data_gen_from_preproc(config, preproc_config, val_ids, fields, fields_obs, output_fields)
 
     model.fit_generator(generator_train, steps_per_epoch=1000,
                         validation_data=generator_val,
-                        # validation_steps=min(100, len(val_ids)),
-                        validation_steps=100,
+                        validation_steps=min(100, len(val_ids)),
+                        # validation_steps=100,
                         use_multiprocessing=False,
                         workers=1,
                         # validation_freq=10, # How often to compute the validation loss
@@ -117,47 +106,47 @@ def doTraining(conf):
 if __name__ == '__main__':
     config = get_training_2d()
     # Single training
-    # doTraining(config)
+    doTraining(config)
 
     # ====================================================================
     # ====================== Multiple trainings ==========================
     # ====================================================================
 
-    orig_name = config[TrainingParams.config_name]
-    depth = len(config[ProjTrainingParams.fields_names]) + len(config[ProjTrainingParams.fields_names_obs]) + len(config[ProjTrainingParams.fields_names_var])
-    config[ModelParams.INPUT_SIZE][2] = depth
-
-    start_i = 0
-    N = 5  # How many networks we want to run for each experiment
-
-    # ========== Testing Network architecture =================
-    # print(" --------------- Testing different architectures -------------------")
-    # network_types = [NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
-    # network_types_names = ["SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
-
-    # local_name = orig_name.replace("OUTPUT", "OUT_SRFHGT")
-    # for i in range(N):
-    #     run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
-    #     for i, net_type_id in enumerate(network_types):
-    #         config[TrainingParams.config_name] = run_name.replace("NETWORK", F"NET_{network_types_names[i]}")
-    #         print(config[TrainingParams.config_name])
-    #         config[ProjTrainingParams.network_type] = net_type_id
+    # orig_name = config[TrainingParams.config_name]
+    # depth = len(config[ProjTrainingParams.fields_names]) + len(config[ProjTrainingParams.fields_names_obs]) + len(config[ProjTrainingParams.fields_names_var])
+    # config[ModelParams.INPUT_SIZE][2] = depth
+    #
+    # start_i = 0
+    # N = 5  # How many networks we want to run for each experiment
+    #
+    # # ========== Testing Network architecture =================
+    # # print(" --------------- Testing different architectures -------------------")
+    # # network_types = [NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
+    # # network_types_names = ["SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
+    #
+    # # local_name = orig_name.replace("OUTPUT", "OUT_SRFHGT")
+    # # for i in range(N):
+    # #     run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
+    # #     for i, net_type_id in enumerate(network_types):
+    # #         config[TrainingParams.config_name] = run_name.replace("NETWORK", F"NET_{network_types_names[i]}")
+    # #         print(config[TrainingParams.config_name])
+    # #         config[ProjTrainingParams.network_type] = net_type_id
+    # #         doTraining(config)
+    #
+    # # ========== Changing output variable =================
+    # print(" --------------- Testing output variables -------------------")
+    # # In this case it is always a UNET
+    # local_name = orig_name.replace("NETWORK", "NET_UNET")
+    # # output_fields = ['srfhgt', 'temp', 'salin', 'u-vel.', 'v-vel.']
+    # output_fields = ['srfhgt']
+    # config[ProjTrainingParams.network_type] = NetworkTypes.UNET
+    # input_size = config[ModelParams.INPUT_SIZE]
+    # for out_field in output_fields:
+    #     for i in range(N):
+    #         run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
+    #         run_name = run_name.replace("ROWS", str(input_size[0]))
+    #         run_name = run_name.replace("COLS", str(input_size[1]))
+    #         config[TrainingParams.config_name] = run_name.replace("OUTPUT", F"OUT_{out_field.upper()}")
+    #         config[ProjTrainingParams.output_fields] = [out_field]
     #         doTraining(config)
-
-    # ========== Changing output variable =================
-    print(" --------------- Testing output variables -------------------")
-    # In this case it is always a UNET
-    local_name = orig_name.replace("NETWORK", "NET_UNET")
-    # output_fields = ['srfhgt', 'temp', 'salin', 'u-vel.', 'v-vel.']
-    output_fields = ['srfhgt']
-    config[ProjTrainingParams.network_type] = NetworkTypes.UNET
-    input_size = config[ModelParams.INPUT_SIZE]
-    for out_field in output_fields:
-        for i in range(N):
-            run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
-            run_name = run_name.replace("ROWS", str(input_size[0]))
-            run_name = run_name.replace("COLS", str(input_size[1]))
-            config[TrainingParams.config_name] = run_name.replace("OUTPUT", F"OUT_{out_field.upper()}")
-            config[ProjTrainingParams.output_fields] = [out_field]
-            doTraining(config)
-            print(config[TrainingParams.config_name])
+    #         print(config[TrainingParams.config_name])

@@ -315,6 +315,83 @@ def generateXandY(input_fields_model, input_fields_obs, input_fields_var, output
     return input_data, y_data
     # return input_data, input_data
 
+def generateXandY3D(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
+                  field_names, obs_field_names, var_field_names, output_fields,
+                  start_row, start_col, rows, cols, z_layers, norm_type = PreprocParams.mean_var, perc_ocean = 1.0):
+    """
+    This function will generate X and Y boxes depening on the required field names and bboxes
+    :param input_fields_model:
+    :param input_fields_obs:
+    :param output_field_increment:
+    :param field_names:
+    :param obs_field_names:
+    :param output_fields:
+    :param start_row:
+    :param start_col:
+    :param rows:
+    :param cols:
+    :return:
+    """
+    num_fields = len(field_names) + len(obs_field_names) + len(var_field_names)
+    input_data = np.zeros((rows, cols, len(z_layers), num_fields))
+    tot_output_fields = len(output_fields)
+    y_data = np.zeros((rows, cols, len(z_layers), tot_output_fields))
+
+    end_row = start_row + rows
+    end_col = start_col + cols
+    id_field = 0 # Id of the input fields
+
+    # ******* Adding the model fields for input ********
+    for c_field in field_names:
+        # Verify for 2D fields. If only 2D then just copy the surface data
+        # input_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_model,
+        #                                            norm_type=norm_type, normalize=True)
+        if input_fields_model[c_field].shape[0] > 1:
+            temp_data = input_fields_model[c_field][z_layers, start_row:end_row, start_col:end_col]
+            input_data[:, :, :, id_field] = np.rollaxis(temp_data, 0, 3)
+        else:
+            temp_data = input_fields_model[c_field][0, start_row:end_row, start_col:end_col]
+            input_data[:, :, 0, id_field] = temp_data
+        id_field += 1
+    # import matplotlib.pyplot as plt
+    # plt.imshow(input_data[:,:,0, 2])
+    # plt.show()
+
+    # ******* Adding the observations fields for input ********
+    for c_field in obs_field_names:
+        # We assume all observations are at most in the surface (no 3D)
+        temp_data = input_fields_obs[c_field][start_row:end_row, start_col:end_col].astype(np.float64)
+        mask = temp_data.mask
+        temp_data[mask] = np.nan
+        input_data[:, :, 0, id_field] = temp_data
+        id_field += 1
+
+    # ******* Adding the variance fields for input ********
+    for c_field in var_field_names:
+        # TODO z_layers are hardcoded, should have been filtered before
+        if len(input_fields_var[c_field].shape) > 2:
+            temp_data = input_fields_var[c_field][0, start_row:end_row, start_col:end_col, 0:z_layers]
+        else:
+            temp_data = input_fields_var[c_field][start_row:end_row, start_col:end_col, 0:z_layers]
+        # input_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_obs,
+        #                                            norm_type=norm_type, normalize=True)
+
+        input_data[:, :, id_field] = temp_data
+        id_field += 1
+
+    # ******************* Filling the 'output' data ***************
+    id_field = 0
+    for c_field in output_fields:
+        # Verify for 2D fields. If only 2D then just copy the surface data
+        if input_fields_model[c_field].shape[0] > 1:
+            temp_data = output_field_increment[c_field][z_layers, start_row:end_row, start_col:end_col]
+            y_data[:, :, :, id_field] = np.rollaxis(temp_data, 0, 3)
+        else:
+            temp_data = output_field_increment[c_field][0, start_row:end_row, start_col:end_col]
+            y_data[:, :, 0, id_field] = temp_data
+        id_field += 1
+
+    return input_data, y_data
 
 
 def get_date_from_preproc_filename(file_name):
