@@ -1,9 +1,9 @@
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import LeakyReLU
 import tensorflow.keras.backend as K
-from io_project.read_utils import generateXandY
+from io_project.read_utils import generateXandY2D
 from constants.AI_params import *
-from config.MainConfig import get_prediction_params
+from config.MainConfig_2D import get_prediction_params
 from models.modelSelector import select_2d_model
 from models.model_viz import print_layer_names, plot_intermediate_2dcnn_feature_map, plot_cnn_filters_by_layer
 from constants.AI_params import TrainingParams
@@ -142,9 +142,9 @@ def singleModel(config):
         for start_row in np.arange(0, 891-rows, rows):
             for start_col in np.arange(0, 1401-cols, cols):
                 try:
-                    input_data, y_data = generateXandY(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
-                                                       model_field_names, obs_field_names, var_field_names, output_fields,
-                                                       start_row, start_col, rows, cols, norm_type=norm_type)
+                    input_data, y_data = generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
+                                                         model_field_names, obs_field_names, var_field_names, output_fields,
+                                                         start_row, start_col, rows, cols, norm_type=norm_type)
                 except Exception as e:
                     print(F"Failed for {c_file} row:{start_row} col:{start_col}")
                     continue

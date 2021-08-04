@@ -28,16 +28,17 @@ def get_preproc_config():
         # Available fields on observations:   ['ssh', 'ssh_err', 'sst', 'sst_err', 'sss', 'sss_err', 'uc', 'vc', 'av_ssh', 'av_ssh_err', 'val', 'err', 'grdi', 'grdj', 'id', 'ob_grp_present', ]
 
         # There MUST be the same number of field names between the two because there is a comparison between them.
-        # PreprocParams.fields_names:     ['u-vel.', 'v-vel.','temp', 'salin', 'thknss', 'srfhgt', 'montg1', 'surflx', 'salflx', 'bl_dpth', 'mix_dpth', 'u_btrop', 'v_btrop'],
-        # PreprocParams.fields_names_obs: ['ssh', 'ssh_err', 'sst', 'sst_err', 'sss', 'sss_err', 'uc', 'vc'],
+        PreprocParams.fields_names:     ['u-vel.', 'v-vel.','temp', 'salin', 'thknss', 'srfhgt', 'montg1', 'surflx', 'salflx', 'bl_dpth', 'mix_dpth', 'u_btrop', 'v_btrop'],
+        PreprocParams.fields_names_obs: ['ssh', 'ssh_err', 'sst', 'sst_err', 'sss', 'sss_err', 'uc', 'vc'],
         # PreprocParams.fields_names:     ['thknss', 'srfhgt', 'temp', 'u-vel.', 'v-vel.','salin', 'mix_dpth'],
         # PreprocParams.fields_names:     ['srfhgt',  'temp', 'thknss', 'u-vel.', 'v-vel.','salin'],
-        PreprocParams.fields_names:     ['srfhgt',  'temp'],
-        PreprocParams.fields_names_obs: ['ssh', 'sst'],
+        # PreprocParams.fields_names:     ['srfhgt',  'temp'],
+        # PreprocParams.fields_names_obs: ['ssh', 'sst'],
         # PreprocParams.plot_modes_per_field: [PlotMode.RASTER, PlotMode.MERGED, PlotMode.RASTER, PlotMode.RASTER, PlotMode.RASTER],
         PreprocParams.plot_modes_per_field: [PlotMode.RASTER for x in range(14)],
         # PreprocParams.layers_to_plot: [0], # Total of 41
-        PreprocParams.layers_to_plot: [0,1,2,3,4,5,10,20,30]
+        PreprocParams.layers_to_plot: [0,1,2,3,4,5,10,20,30],
+        PreprocParams.output_stats_file: join(_output_folder, 'preproc','stats')
         # layer 0 --> z-coordinate everywhere  (1 mt depth)
         # layer 1 to 16 --> sigma- coordinate for 'shallow areas' and z coordinates inside the Gulf (deeper)
         # layer 16 to 41 --> ro- coordinates everywhere.

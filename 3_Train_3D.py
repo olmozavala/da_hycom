@@ -1,8 +1,8 @@
 from datetime import datetime
 
-from config.MainConfig import get_training_2d
+from config.MainConfig_2D import get_training
 from config.PreprocConfig import get_preproc_config
-from AI.data_generation.GeneratorRaw3D import data_gen_from_preproc
+from AI.data_generation.GeneratorRaw3D import data_gen_from_raw
 
 from constants_proj.AI_proj_params import ProjTrainingParams, ParallelParams, NetworkTypes, PreprocParams
 import trainingutils as utilsNN
@@ -90,8 +90,8 @@ def doTraining(conf):
 
     print("Training ...")
     # # ----------- Using preprocessed data -------------------
-    generator_train = data_gen_from_preproc(config, preproc_config, train_ids, fields, fields_obs, output_fields)
-    generator_val = data_gen_from_preproc(config, preproc_config, val_ids, fields, fields_obs, output_fields)
+    generator_train = data_gen_from_raw(config, preproc_config, train_ids, fields, fields_obs, output_fields)
+    generator_val = data_gen_from_raw(config, preproc_config, val_ids, fields, fields_obs, output_fields)
 
     model.fit_generator(generator_train, steps_per_epoch=min(1000, len(train_ids)),
                         validation_data=generator_val,
@@ -104,7 +104,7 @@ def doTraining(conf):
 
 
 if __name__ == '__main__':
-    config = get_training_2d()
+    config = get_training()
     # Single training
     doTraining(config)
 

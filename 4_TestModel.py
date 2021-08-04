@@ -1,5 +1,5 @@
 import os
-from io_project.read_utils import generateXandY, normalizeData
+from io_project.read_utils import generateXandY2D, normalizeData
 
 from tensorflow.keras.utils import plot_model
 from inout.io_netcdf import read_netcdf
@@ -9,7 +9,7 @@ import pandas as pd
 import time
 
 from img_viz.eoa_viz import EOAImageVisualizer
-from config.MainConfig import get_prediction_params
+from config.MainConfig_2D import get_prediction_params
 from constants_proj.AI_proj_params import PredictionParams, ProjTrainingParams, PreprocParams
 from models.modelSelector import select_2d_model
 from models_proj.models import *
@@ -192,9 +192,9 @@ def test_model(config):
                 # Generate the proper inputs for the NN
                 try:
                     perc_ocean = .05
-                    input_data, y_data = generateXandY(input_fields_model, input_fields_obs, input_fields_std, output_field_increment,
-                                                       field_names_model, field_names_obs, field_names_std, output_fields,
-                                                       start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
+                    input_data, y_data = generateXandY2D(input_fields_model, input_fields_obs, input_fields_std, output_field_increment,
+                                                         field_names_model, field_names_obs, field_names_std, output_fields,
+                                                         start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
                 except Exception as e:
                     print(F"Land for {c_file} row:{start_row} col:{start_col}")
                     start_col, donecol = verifyBoundaries(start_col, cols, tot_cols)

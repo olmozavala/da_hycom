@@ -31,6 +31,7 @@ class PreprocParams(Enum):
     type_obs = 16
     type_inc = 17
     type_std = 18
+    output_stats_file = 19
 
 
 

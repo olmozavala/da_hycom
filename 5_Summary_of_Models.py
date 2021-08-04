@@ -5,7 +5,7 @@ import matplotlib.cm as cm
 import numpy as np
 import pandas as pd
 
-from config.MainConfig import get_training_2d
+from config.MainConfig_2D import get_training
 from constants.AI_params import TrainingParams, ModelParams
 from constants_proj.AI_proj_params import ProjTrainingParams
 from img_viz.common import create_folder
@@ -88,7 +88,7 @@ if __name__ == '__main__':
     LOSS  = "Loss value"
 
     # Read folders for all the experiments
-    config = get_training_2d()
+    config = get_training()
     trained_models_folder = config[TrainingParams.output_folder]
     output_folder = config[ProjTrainingParams.output_folder_summary_models]
     create_folder(output_folder)

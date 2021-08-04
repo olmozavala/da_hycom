@@ -1,12 +1,12 @@
 from datetime import datetime
-from config.MainConfig_3D import get_training_2d
+from config.MainConfig_2D import get_training
 from config.PreprocConfig import get_preproc_config
-from AI.data_generation.GeneratorRaw3D import data_gen_from_preproc
+from AI.data_generation.GeneratorRaw2D import data_gen_from_raw
 
 from constants_proj.AI_proj_params import ProjTrainingParams, ParallelParams, NetworkTypes, PreprocParams
 import trainingutils as utilsNN
 # import models.modelBuilder3D as model_builder
-from models.modelSelector import select_2d_model, select_3d_model
+from models.modelSelector import select_2d_model
 from models_proj.models import *
 from img_viz.common import create_folder
 from io_project.read_utils import get_preproc_increment_files
@@ -68,8 +68,7 @@ def doTraining(conf):
     model_name = F'{run_name}_{now}'
 
     # ******************* Selecting the model **********************
-    model = select_3d_model(config, last_activation=None, output_bands=len(output_fields))
-
+    model = select_2d_model(config, last_activation=None)
 
     plot_model(model, to_file=join(output_folder,F'{model_name}.png'), show_shapes=True)
 
@@ -89,8 +88,8 @@ def doTraining(conf):
 
     print("Training ...")
     # # ----------- Using preprocessed data -------------------
-    generator_train = data_gen_from_preproc(config, preproc_config, train_ids, fields, fields_obs, output_fields)
-    generator_val = data_gen_from_preproc(config, preproc_config, val_ids, fields, fields_obs, output_fields)
+    generator_train = data_gen_from_raw(config, preproc_config, train_ids, fields, fields_obs, output_fields)
+    generator_val = data_gen_from_raw(config, preproc_config, val_ids, fields, fields_obs, output_fields)
 
     model.fit_generator(generator_train, steps_per_epoch=min(1000, len(train_ids)),
                         validation_data=generator_val,
@@ -103,7 +102,7 @@ def doTraining(conf):
 
 
 if __name__ == '__main__':
-    config = get_training_2d()
+    config = get_training()
     # Single training
     doTraining(config)
 

@@ -11,7 +11,7 @@ import re
 import numpy as np
 from multiprocessing import Pool
 from constants_proj.AI_proj_params import PreprocParams, ParallelParams, ProjTrainingParams
-from config.MainConfig import get_training_2d
+from config.MainConfig_2D import get_training
 import matplotlib.pyplot as plt
 
 # Not sure how to move this inside the function
@@ -24,7 +24,7 @@ def ComputeOverallMinMaxVar():
     Computes the mean, max and variance for all the fields in the files
     :return:
     """
-    config = get_training_2d()
+    config = get_training()
     input_folder = config[ProjTrainingParams.input_folder_preproc]
     fields = config[ProjTrainingParams.fields_names]
     fields_obs = config[ProjTrainingParams.fields_names_obs]

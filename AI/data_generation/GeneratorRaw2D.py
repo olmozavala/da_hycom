@@ -1,6 +1,6 @@
 import numpy as np
 from inout.io_netcdf import read_netcdf
-from io_project.read_utils import generateXandY3D, generateXandYMulti, get_date_from_preproc_filename
+from io_project.read_utils import generateXandY2D, generateXandYMulti, get_date_from_preproc_filename
 from os.path import join, exists
 from constants_proj.AI_proj_params import MAX_MODEL, MAX_OBS, MIN_OBS, MIN_MODEL, MAX_INCREMENT, MIN_INCREMENT
 import os
@@ -56,7 +56,7 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
     #
     rows = config[ProjTrainingParams.rows]
     cols = config[ProjTrainingParams.cols]
-    z_layers = range(config[ModelParams.INPUT_SIZE][2])
+    z_layers = [0] # Because it is 2D we only focus on zlayer =0
     norm_type = config[ProjTrainingParams.norm_type]
     #
     # # Read the variance of selected
@@ -97,11 +97,9 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
                 perc_ocean = 0  # We don't care if there is ocean or not
 
                 try:
-                    input_data, y_data = generateXandY3D(input_fields_model, input_fields_obs, [], output_field_increment,
+                    input_data, y_data = generateXandY2D(input_fields_model, input_fields_obs, [], output_field_increment,
                                                        field_names, obs_field_names, [], output_fields,
-                                                       start_row, start_col, rows, cols, z_layers, norm_type=norm_type, perc_ocean=perc_ocean)
-
-
+                                                       start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
                     # import matplotlib.pyplot as plt
                     # plt.imshow(input_data[:,:,0, 2])
                     # plt.show()
