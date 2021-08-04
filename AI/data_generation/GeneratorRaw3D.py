@@ -30,6 +30,9 @@ def data_gen_from_preproc(config, preproc_config, ids, field_names, obs_field_na
     increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) if x.endswith('.a')])
     increment_files.sort()
     increment_files = increment_files[ids]  # Just reading the desired ids
+
+    sub_ids = np.arange(0,len(ids)) # Reset and shuffle the ids
+    np.random.shuffle(sub_ids) # We shuffle the folders every time we have tested all the examples
     # To avoid problem with matching files we will obtain the date from the increment file and manually searh for the
     # corresponding background and observation files
     background_files = []
@@ -69,9 +72,9 @@ def data_gen_from_preproc(config, preproc_config, ids, field_names, obs_field_na
             ex_id += 1
         else:
             ex_id = 0
-            np.random.shuffle(ids) # We shuffle the folders every time we have tested all the examples
+            np.random.shuffle(sub_ids) # We shuffle the folders every time we have tested all the examples
 
-        c_id = ids[ex_id]
+        c_id = sub_ids[ex_id]
         try:
             increment_file_name = increment_files[c_id]
             obs_file_name = obs_files[c_id]
@@ -102,7 +105,6 @@ def data_gen_from_preproc(config, preproc_config, ids, field_names, obs_field_na
                     # import matplotlib.pyplot as plt
                     # plt.imshow(input_data[:,:,0, 2])
                     # plt.show()
-
                 except Exception as e:
                     print(F"Failed for {model_file_name}: {e}")
                     continue
@@ -110,25 +112,32 @@ def data_gen_from_preproc(config, preproc_config, ids, field_names, obs_field_na
                 succ_attempts += 1
 
                 # We set a value of 0.5 on the land. Trying a new loss function that do not takes into account land
-                # input_data = np.nan_to_num(input_data, nan=0)
-                # y_data = np.nan_to_num(y_data, nan=0)
+                input_data = np.nan_to_num(input_data, nan=0)
+                y_data = np.nan_to_num(y_data, nan=0)
 
                 X = np.expand_dims(input_data, axis=0)
                 Y = np.expand_dims(y_data, axis=0)
                 # --------------- Just for debugging Plotting input and output---------------------------
-                import matplotlib.pyplot as plt
-                # mincbar = np.nanmin(input_data)
-                # maxcbar = np.nanmax(input_data)
-                output_folder = config[TrainingParams.output_folder]
-                # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
-                viz_obj = EOAImageVisualizer(output_folder=join(output_folder, "training_imgs"), disp_images=False)
-                viz_obj.plot_3d_data_np(np.rollaxis(np.rollaxis(X[0,:,:,:],3,0), 3, 1),
-                                            var_names=[F"in_model_{x}" for x in field_names] +
-                                                      [F"in_obs_{x}" for x in obs_field_names],
-                                            flip_data=True,
-                                            z_levels=[0, 1, 2, 3],
-                                            file_name_prefix=F"{c_id}_{start_col}_{start_row}",
-                                            title=F"")
+                # import matplotlib.pyplot as plt
+                # # mincbar = np.nanmin(input_data)
+                # # maxcbar = np.nanmax(input_data)
+                # output_folder = config[TrainingParams.output_folder]
+                # # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
+                # viz_obj = EOAImageVisualizer(output_folder=join(output_folder, "training_imgs"), disp_images=False)
+                # viz_obj.plot_3d_data_np(np.rollaxis(np.rollaxis(X[0,:,:,:],3,0), 3, 1),
+                #                             var_names=[F"in_model_{x}" for x in field_names] +
+                #                                       [F"in_obs_{x}" for x in obs_field_names],
+                #                             flip_data=True,
+                #                             z_levels=[0, 1, 2, 3],
+                #                             file_name_prefix=F"{c_id}_{start_col}_{start_row}",
+                #                             title=F"")
+                #
+                # viz_obj.plot_3d_data_np(np.rollaxis(np.rollaxis(Y[0,:,:,:],3,0), 3, 1),
+                #                         var_names=[F"out_model_{x}" for x in output_fields] ,
+                #                         flip_data=True,
+                #                         z_levels=[0, 1, 2, 3],
+                #                         file_name_prefix=F"{c_id}_{start_col}_{start_row}_out",
+                #                         title=F"")
 
                 yield X, Y
                 # yield [np.zeros((1, 384, 520, 24, 8))], [np.zeros((1, 384, 520, 24, 6))]

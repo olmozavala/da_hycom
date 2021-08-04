@@ -1,5 +1,6 @@
 from datetime import datetime
-from config.MainConfig_3D import get_training_2d
+
+from config.MainConfig import get_training_2d
 from config.PreprocConfig import get_preproc_config
 from AI.data_generation.GeneratorRaw3D import data_gen_from_preproc
 
