@@ -274,6 +274,9 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
     # ******* Adding the model fields for input ********
     for c_field in field_names:
         temp_data = input_fields_model[c_field][0, start_row:end_row, start_col:end_col]
+        if c_field == "thknss":
+            divide = 9806
+            temp_data = temp_data/divide
         # For debugging
         # import matplotlib.pyplot as plt
         # plt.imshow(temp_data.data)

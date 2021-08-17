@@ -12,10 +12,13 @@ import cmocean
 from img_viz.eoa_viz import EOAImageVisualizer
 from config.MainConfig_2D import get_prediction_params
 from constants_proj.AI_proj_params import PredictionParams, ProjTrainingParams, PreprocParams
+from config.PreprocConfig import get_preproc_config
 from models.modelSelector import select_2d_model
 from models_proj.models import *
 from constants.AI_params import TrainingParams, ModelParams
 from img_viz.common import create_folder
+from datetime import datetime
+from inout.io_hycom import read_hycom_fields
 
 from sklearn.metrics import mean_squared_error
 
@@ -32,13 +35,12 @@ def main():
 
     config = get_prediction_params()
     # -------- For single model testing --------------
-    # test_model(config)
+    test_model(config)
 
     # -------- For all summary model testing --------------
     summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
     # summary_file = "/home/data/MURI/output/SUMMARY/summary.csv"
     df = pd.read_csv(summary_file)
-
 
     for model_id in range(len(df)):
         model = df.iloc[model_id]
@@ -80,20 +82,23 @@ def test_model(config):
     output_fields = config[ProjTrainingParams.output_fields]
     model_weights_file = config[PredictionParams.model_weights_file]
     output_imgs_folder = config[PredictionParams.output_imgs_folder]
-    field_names_model = config[ProjTrainingParams.fields_names]
-    field_names_obs = config[ProjTrainingParams.fields_names_obs]
+    field_names = config[ProjTrainingParams.fields_names]
+    obs_field_names = config[ProjTrainingParams.fields_names_obs]
     rows = config[ProjTrainingParams.rows]
     cols = config[ProjTrainingParams.cols]
     run_name = config[TrainingParams.config_name]
     norm_type = config[ProjTrainingParams.norm_type]
+    preproc_config = get_preproc_config()
+
+    input_folder_background =   preproc_config[PreprocParams.input_folder_hycom]
+    input_folder_increment =    preproc_config[PreprocParams.input_folder_tsis]
+    input_folder_observations = preproc_config[PreprocParams.input_folder_obs]
 
     output_imgs_folder = join(output_imgs_folder, run_name)
     create_folder(output_imgs_folder)
 
-
     # *********** Chooses the proper model ***********
     print('Reading model ....')
-
 
     net_type = config[ProjTrainingParams.network_type]
     if net_type == NetworkTypes.UNET or net_type == NetworkTypes.UNET_MultiStream:
@@ -114,9 +119,8 @@ def test_model(config):
     model.load_weights(model_weights_file)
 
     # *********** Read files to predict***********
-    all_files = os.listdir(input_folder)
-    all_files.sort()
-    model_files = np.array([x for x in all_files if x.startswith('model')])
+    increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) if x.endswith('.a')])
+    increment_files.sort()
 
     z_layers = [0]
     var_file = join(input_folder, "cov_mat", "tops_ias_std.nc")
@@ -127,40 +131,42 @@ def test_model(config):
         input_fields_std = []
 
     cmap_out = chooseCMAP(output_fields)
-    cmap_model = chooseCMAP(field_names_model)
-    cmap_obs = chooseCMAP(field_names_obs)
+    cmap_model = chooseCMAP(field_names)
+    cmap_obs = chooseCMAP(obs_field_names)
     cmap_std = chooseCMAP(field_names_std)
 
     tot_rows = 891
     tot_cols = 1401
 
+    start_row = 384 - rows  # These hardcoded numbers come from the specific size of these files
+    start_col = 525 - cols
+
     all_whole_mean_times = []
     all_whole_sum_times = []
     all_whole_rmse = []
 
-    # np.random.shuffle(model_files)  # TODO this is only for testing
-    for id_file, c_file in enumerate(model_files):
+    for id_file, c_file in enumerate(increment_files):
         # Find current and next date
-        year = int(c_file.split('_')[1])
-        day_of_year = int(c_file.split('_')[2].split('.')[0])
+        sp_name = c_file.split("/")[-1].split(".")[1]
+        c_datetime = datetime.strptime(sp_name, "%Y_%j_18")
 
-        model_file = join(input_folder, F'model_{year}_{day_of_year:03d}.nc')
-        inc_file = join(input_folder,F'increment_{year}_{day_of_year:03d}.nc')
-        obs_file = join(input_folder,F'obs_{year}_{day_of_year:03d}.nc')
+        model_file_name = join(input_folder_background, F"020_archv.{c_datetime.strftime('%Y_%j')}_18.a")
+        increment_file_name = c_file
+        obs_file_name = join(input_folder_observations, F"tsis_obs_gomb4_{c_datetime.strftime('%Y%m%d')}00.nc")
 
         # *********************** Reading files **************************
-        input_fields_model = read_netcdf(model_file, field_names_model, z_layers)
-        input_fields_obs = read_netcdf(obs_file, field_names_obs, z_layers)
-        output_field_increment = read_netcdf(inc_file, output_fields, z_layers)
+        input_fields_model = read_hycom_fields(model_file_name, field_names, z_layers)
+        input_fields_obs = read_netcdf(obs_file_name, obs_field_names, z_layers)
+        output_field_increment = read_hycom_fields(increment_file_name, output_fields, z_layers)
 
         # ******************* Normalizing and Cropping Data *******************
         this_file_times = []
 
         try:
-            perc_ocean = .01
+            perc_ocean = 0
             input_data, y_data = generateXandY2D(input_fields_model, input_fields_obs, input_fields_std, output_field_increment,
-                                                 field_names_model, field_names_obs, field_names_std, output_fields,
-                                                 0, 0, grows, gcols, norm_type=norm_type, perc_ocean=perc_ocean)
+                                                 field_names, obs_field_names, field_names_std, output_fields,
+                                                 start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
         except Exception as e:
             print(F"Exception {e}")
 
@@ -187,7 +193,7 @@ def test_model(config):
         denorm_cnn_output = denormalizeData(output_nn_original, output_fields, PreprocParams.type_inc, norm_type)
         denorm_y = denormalizeData(Y, output_fields, PreprocParams.type_inc, norm_type)
         input_types = [PreprocParams.type_model for i in input_fields_model] + [PreprocParams.type_obs for i in input_fields_obs] + [PreprocParams.type_std for i in input_fields_std]
-        denorm_input = denormalizeData(input_data, field_names_model+field_names_obs+field_names_std, input_types, norm_type)
+        denorm_input = denormalizeData(input_data, field_names+obs_field_names+field_names_std, input_types, norm_type)
 
         # Recover the original land areas, they are lost after denormalization
         denorm_y[land_indexes] = np.nan
@@ -233,49 +239,47 @@ def test_model(config):
 
         # if day_of_year == 353: # Plot 10% of the times
         if True: # Plot 10% of the times
-
             # viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
             viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False)
 
-
             # viz_obj.plot_2d_data_np_raw(np.concatenate((input_data.swapaxes(0,2), Y[0,:,:,:].swapaxes(0,2), output_nn_original[0,:,:,:].swapaxes(0,2))),
             viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_input.swapaxes(0,2), denorm_y.swapaxes(0,2), denorm_cnn_output.swapaxes(0,2))),
-                                        var_names=[F"in_model_{x}" for x in field_names_model] +
-                                                  [F"in_obs_{x}" for x in field_names_obs] +
+                                        var_names=[F"in_model_{x}" for x in field_names] +
+                                                  [F"in_obs_{x}" for x in obs_field_names] +
                                                   [F"in_var_{x}" for x in field_names_std] +
                                                   [F"out_inc_{x}" for x in output_fields] +
                                                   [F"cnn_{x}" for x in output_fields],
-                                        file_name=F"Global_Input_and_CNN_{c_file}",
+                                        file_name=F"Global_Input_and_CNN_{sp_name}",
                                         rot_90=True,
                                         cmap=cmap_model+cmap_obs+cmap_std+cmap_out+cmap_out,
-                                        cols_per_row=len(field_names_model),
-                                        title=F"Input data: {field_names_model} and obs {field_names_obs}, increment {output_fields}, cnn {output_fields}")
+                                        cols_per_row=len(field_names),
+                                        title=F"Input data: {field_names} and obs {obs_field_names}, increment {output_fields}, cnn {output_fields}")
 
-            minmax = getMinMaxPlot(output_fields)[0]
-            viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
-                                         # mincbar=mincbar + mincbar + mincbarerror,
-                                         # maxcbar=maxcbar + maxcbar + maxcbarerror)
-                                         # mincbar=[minmax[0], minmax[0], max(minmax[0],-1)],
-                                         # maxcbar=[minmax[1], minmax[1], min(minmax[1],1)])
-                                        mincbar=[minmax[0], minmax[0], -1],
-                                        maxcbar=[minmax[1], minmax[1], 1])
-
-            # ================== Displays CNN and TSIS with RMSE ================
-            error_cmap = cmocean.cm.diff
-            viz_obj.output_folder = join(output_imgs_folder,'WholeOutput_CNN_TSIS')
-            viz_obj.plot_2d_data_np_raw([np.flip(whole_cnn, axis=0), np.flip(whole_y, axis=0), np.flip(error, axis=0)],
-                                        # var_names=[F"CNN INC {x}" for x in output_fields] + [F"TSIS INC {x}" for x in output_fields] + [F'TSIS - CNN (Mean RMSE {rmse_cnn:0.4f} m)'],
-                                        var_names=[F"CNN increment SSH" for x in output_fields] + [F"TSIS increment SSH" for x in output_fields] + [F'TSIS - CNN \n (Mean RMSE {rmse_cnn:0.4f} m)'],
-                                        file_name=F"Global_WholeOutput_CNN_TSIS_{c_file}",
-                                        rot_90=False,
-                                        cmap=cmap_out+cmap_out+[error_cmap],
-                                        cols_per_row=3,
-                                        # title=F"{output_fields[0]} RMSE: {np.mean(rmse_cnn):0.5f} m.")
-                                        title=F"SSH RMSE: {np.mean(rmse_cnn):0.5f} m.")
+            # # ================== Displays CNN and TSIS with RMSE ================
+            # minmax = getMinMaxPlot(output_fields)[0]
+            # viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
+            #                              # mincbar=mincbar + mincbar + mincbarerror,
+            #                              # maxcbar=maxcbar + maxcbar + maxcbarerror)
+            #                              # mincbar=[minmax[0], minmax[0], max(minmax[0],-1)],
+            #                              # maxcbar=[minmax[1], minmax[1], min(minmax[1],1)])
+            #                             mincbar=[minmax[0], minmax[0], -1],
+            #                             maxcbar=[minmax[1], minmax[1], 1])
+            #
+            # error_cmap = cmocean.cm.diff
+            # viz_obj.output_folder = join(output_imgs_folder,'WholeOutput_CNN_TSIS')
+            # viz_obj.plot_2d_data_np_raw([np.flip(whole_cnn, axis=0), np.flip(whole_y, axis=0), np.flip(error, axis=0)],
+            #                             # var_names=[F"CNN INC {x}" for x in output_fields] + [F"TSIS INC {x}" for x in output_fields] + [F'TSIS - CNN (Mean RMSE {rmse_cnn:0.4f} m)'],
+            #                             var_names=[F"CNN increment SSH" for x in output_fields] + [F"TSIS increment SSH" for x in output_fields] + [F'TSIS - CNN \n (Mean RMSE {rmse_cnn:0.4f} m)'],
+            #                             file_name=F"Global_WholeOutput_CNN_TSIS_{c_file}",
+            #                             rot_90=False,
+            #                             cmap=cmap_out+cmap_out+[error_cmap],
+            #                             cols_per_row=3,
+            #                             # title=F"{output_fields[0]} RMSE: {np.mean(rmse_cnn):0.5f} m.")
+            #                             title=F"SSH RMSE: {np.mean(rmse_cnn):0.5f} m.")
 
             print("DONE ALL FILES!!!!!!!!!!!!!")
     dic_summary = {
-        "File": model_files,
+        "File": increment_files,
         "rmse": all_whole_rmse,
         "times mean": all_whole_mean_times,
         "times sum": all_whole_sum_times,

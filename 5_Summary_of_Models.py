@@ -104,6 +104,8 @@ if __name__ == '__main__':
 
     # Iterate over all the experiments
     for experiment in all_folders:
+        if experiment == "training_imgs":
+            break
         all_models = os.listdir(join(trained_models_folder, experiment , "models"))
         min_loss = 100000.0
         best_model = {}

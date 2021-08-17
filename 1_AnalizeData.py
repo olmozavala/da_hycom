@@ -55,7 +55,7 @@ def plot_raw_data_new(proc_id):
     plot_modes = config[PreprocParams.plot_modes_per_field]
     layers = config[PreprocParams.layers_to_plot]
 
-    img_viz = EOAImageVisualizer(output_folder=output_folder, disp_images=False)
+    img_viz = EOAImageVisualizer(output_folder=output_folder, disp_images=True)
 
     # Iterate current year
     for c_year in YEARS:
@@ -141,26 +141,26 @@ def plot_raw_data_new(proc_id):
                             inc = (model_state_np_c_field - increment_np_c_field)
 
                         # ======================= Only Background state and TSIS increment ==================
-                        # try:
-                        #     title = F"{c_field_name} {c_year}_{c_month:02d}_{(c_day_of_month+1):02d}"
-                        #     img_viz.plot_3d_data_np([model_state_np_c_field, inc],
-                        #     # img_viz.plot_3d_data_np([model_state_np_c_field, increment_np_c_field],
-                        #                             var_names=['HYCOM', 'Increment (TSIS)'],
-                        #                             title=title, file_name_prefix=F'ModelAndIncrement_{c_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
-                        #                             flip_data=True, plot_mode=plot_modes[idx_field], maxcbar=maxcbar, mincbar=mincbar)
-                        # except Exception as e:
-                        #     print(F"Failed for field: {c_field_name}: {e}")
+                        try:
+                            title = F"{c_field_name} {c_year}_{c_month:02d}_{(c_day_of_month+1):02d}"
+                            img_viz.plot_3d_data_np([model_state_np_c_field, inc],
+                            # img_viz.plot_3d_data_np([model_state_np_c_field, increment_np_c_field],
+                                                    var_names=['HYCOM', 'Increment (TSIS)'],
+                                                    title=title, file_name_prefix=F'ModelAndIncrement_{c_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
+                                                    flip_data=True, plot_mode=plot_modes[idx_field], maxcbar=maxcbar, mincbar=mincbar)
+                        except Exception as e:
+                            print(F"Failed for field: {c_field_name}: {e}")
 
                         # # ======================= Only HYCOM, TSIS, Observations ==================
-                        c_obs_field_name = fields_obs[idx_field]
-                        # title = F"{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}"
-                        title = F"{(c_day_of_month+1):02d}"
-                        obs_np_c_field = obs_np_fields[c_obs_field_name]
-                        # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, inc],
-                        img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, np.expand_dims(obs_np_c_field, 0) - model_state_np_c_field, inc],
-                                                var_names=[F'Obs', 'HYCOM', 'OBS-HYCOM', 'INC'],
-                                                title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
-                                                flip_data=True, plot_mode=plot_modes[idx_field])
+                        # c_obs_field_name = fields_obs[idx_field]
+                        # # title = F"{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}"
+                        # title = F"{(c_day_of_month+1):02d}"
+                        # obs_np_c_field = obs_np_fields[c_obs_field_name]
+                        # # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, inc],
+                        # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, np.expand_dims(obs_np_c_field, 0) - model_state_np_c_field, inc],
+                        #                         var_names=[F'Obs', 'HYCOM', 'OBS-HYCOM', 'INC'],
+                        #                         title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
+                        #                         flip_data=True, plot_mode=plot_modes[idx_field])
                 break
 
 def plot_raw_data(proc_id):

@@ -56,44 +56,44 @@ def main():
 
     config = get_prediction_params()
     # -------- For single model testing --------------
-    # test_model(config)
+    test_model(config)
 
     # -------- For all summary model testing --------------
-    summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
-    # summary_file = "/home/data/MURI/output/SUMMARY/summary.csv"
-    df = pd.read_csv(summary_file)
-    for model_id in range(len(df)):
-        model = df.iloc[model_id]
-
-        # Setting Network type (only when network type is UNET)
-        name = model["Name"]
-        network_arch, network_type = getNeworkArchitectureAndTypeFromName(getNetworkTypeTxt(name))
-        config[ModelParams.MODEL] = network_arch
-        config[ProjTrainingParams.network_type] = network_type
-        # Setting input vars
-        # model_fields, obs_fields, var_fields = getInputFields(name)
-        var_fields = getInputVarFields(name)
-        model_fields = config[ProjTrainingParams.fields_names]
-        obs_fields = config[ProjTrainingParams.fields_names_obs]
-        print(F"Input fields: {model_fields}, {obs_fields}, {var_fields}")
-        # config[ProjTrainingParams.fields_names] = model_fields
-        # config[ProjTrainingParams.fields_names_obs] = obs_fields
-        config[ProjTrainingParams.fields_names_var] = var_fields
-        # Setting BBOX
-        train_rows, train_cols = [int(x) for x in model["BBOX"].split("x")]
-        config[ModelParams.INPUT_SIZE][0] = train_rows
-        config[ModelParams.INPUT_SIZE][1] = train_cols
-        config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(var_fields)
-        # Setting output vars
-        output_fields = getOutputFields(name)
-        config[ProjTrainingParams.output_fields] = output_fields
-        # Setting model weights file
-        config[PredictionParams.model_weights_file] = model["Path"]
-        print(F"Model's weight file: {model['Path']}")
-        # Set the name of the network
-        run_name = name.replace(".hdf5", "")
-        config[TrainingParams.config_name] = run_name
-        test_model(config)
+    # summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
+    # # summary_file = "/home/data/MURI/output/SUMMARY/summary.csv"
+    # df = pd.read_csv(summary_file)
+    # for model_id in range(len(df)):
+    #     model = df.iloc[model_id]
+    #
+    #     # Setting Network type (only when network type is UNET)
+    #     name = model["Name"]
+    #     network_arch, network_type = getNeworkArchitectureAndTypeFromName(getNetworkTypeTxt(name))
+    #     config[ModelParams.MODEL] = network_arch
+    #     config[ProjTrainingParams.network_type] = network_type
+    #     # Setting input vars
+    #     # model_fields, obs_fields, var_fields = getInputFields(name)
+    #     var_fields = getInputVarFields(name)
+    #     model_fields = config[ProjTrainingParams.fields_names]
+    #     obs_fields = config[ProjTrainingParams.fields_names_obs]
+    #     print(F"Input fields: {model_fields}, {obs_fields}, {var_fields}")
+    #     # config[ProjTrainingParams.fields_names] = model_fields
+    #     # config[ProjTrainingParams.fields_names_obs] = obs_fields
+    #     config[ProjTrainingParams.fields_names_var] = var_fields
+    #     # Setting BBOX
+    #     train_rows, train_cols = [int(x) for x in model["BBOX"].split("x")]
+    #     config[ModelParams.INPUT_SIZE][0] = train_rows
+    #     config[ModelParams.INPUT_SIZE][1] = train_cols
+    #     config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(var_fields)
+    #     # Setting output vars
+    #     output_fields = getOutputFields(name)
+    #     config[ProjTrainingParams.output_fields] = output_fields
+    #     # Setting model weights file
+    #     config[PredictionParams.model_weights_file] = model["Path"]
+    #     print(F"Model's weight file: {model['Path']}")
+    #     # Set the name of the network
+    #     run_name = name.replace(".hdf5", "")
+    #     config[TrainingParams.config_name] = run_name
+    #     test_model(config)
 
     # In this case we test all the best models
 

@@ -1,5 +1,5 @@
 from info.info_hycom import read_field_names
-from inout.io_hycom import read_hycom_output
+from inout.io_hycom import read_hycom_fields
 from inout.io_netcdf import read_netcdf
 from img_viz.eoa_viz import EOAImageVisualizer
 from img_viz.constants import PlotMode
@@ -69,6 +69,7 @@ def ComputeOverallMinMaxVar():
         input_fields_model = read_netcdf(model_file, fields, z_layers)
         input_fields_obs = read_netcdf(obs_file, fields_obs, z_layers)
         output_field_increment = read_netcdf(inc_file, fields, z_layers)
+
 
         # =============== Computing max values for the model
         for idx_field, c_field_name in enumerate(fields):
@@ -224,9 +225,9 @@ def main():
     # p = Pool(NUM_PROC)
     # p.map(parallel_proc, range(NUM_PROC))
     # ---------- -------------
-    # ComputeOverallMinMaxVar()
-    std_file = "/data/HYCOM/DA_HYCOM_TSIS/preproc/cov_mat/tops_ias_std.nc"
-    ComputeMinMaxSTDFields(std_file, ['tem', 'sal', 'ssh', 'mdt'], "STD_vars_min_max.csv")
+    ComputeOverallMinMaxVar()
+    # std_file = "/data/HYCOM/DA_HYCOM_TSIS/preproc/cov_mat/tops_ias_std.nc"
+    # ComputeMinMaxSTDFields(std_file, ['tem', 'sal', 'ssh', 'mdt'], "STD_vars_min_max.csv")
 
 if __name__ == '__main__':
     main()
