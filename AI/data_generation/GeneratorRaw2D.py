@@ -1,5 +1,5 @@
 import numpy as np
-from inout.io_netcdf import read_netcdf
+from inout.io_netcdf import read_netcdf, read_netcdf_xr
 from io_project.read_utils import generateXandY2D, generateXandYMulti, get_date_from_preproc_filename
 from os.path import join, exists
 from constants_proj.AI_proj_params import MAX_MODEL, MAX_OBS, MIN_OBS, MIN_MODEL, MAX_INCREMENT, MIN_INCREMENT
@@ -11,7 +11,7 @@ from img_viz.eoa_viz import EOAImageVisualizer
 from constants.AI_params import AiModels, ModelParams
 from datetime import datetime
 
-def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names, output_fields, z_layers=[0]):
+def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names, output_fields, z_layers=[0], examples_per_figure):
     """
     This generator should generate X and Y for a CNN
     :param path:
@@ -20,11 +20,12 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
     """
     ex_id = -1
     np.random.shuffle(ids)
-    batch_size = config[TrainingParams.batch_size]
 
     input_folder_background =   preproc_config[PreprocParams.input_folder_hycom]
     input_folder_increment =    preproc_config[PreprocParams.input_folder_tsis]
     input_folder_observations = preproc_config[PreprocParams.input_folder_obs]
+
+    perc_ocean = config[ProjTrainingParams.perc_ocean]
 
     # --------- Reading all file names --------------
     increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) if x.endswith('.a')])
@@ -82,29 +83,24 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
 
             # *********************** Reading files **************************
             input_fields_model = read_hycom_fields(model_file_name, field_names, z_layers)
-            input_fields_obs = read_netcdf(obs_file_name, obs_field_names, z_layers)
+            input_fields_obs = read_netcdf_xr(obs_file_name, obs_field_names, z_layers)
             output_field_increment = read_hycom_fields(increment_file_name, output_fields, z_layers)
 
-            # import matplotlib.pyplot as plt
-            # plt.imshow(input_fields_model['temp'][0,:,:])
-            # plt.show()
             succ_attempts = 0
-            while succ_attempts < batch_size:
-                # start_row = np.random.randint(0, 891 - rows)  # These hardcoded numbers come from the specific size of these files
-                # start_col = np.random.randint(0, 1401 - cols)
-                start_row = 384 - rows  # These hardcoded numbers come from the specific size of these files
-                start_col = 525 - cols
-                perc_ocean = 0  # We don't care if there is ocean or not
+            while succ_attempts < examples_per_figure: # Generate multiple images from the same file
+                if rows < 300: # In this case we assume we are looking at smaller BBOX
+                    start_row = np.random.randint(0, 384 - rows)  # These hardcoded numbers come from the specific size of these files
+                    start_col = np.random.randint(0, 525 - cols)
+                else:  # In this case we assume we really want to use the whole domain
+                    start_row = 384 - rows  # These hardcoded numbers come from the specific size of these files
+                    start_col = 525 - cols
 
                 try:
                     input_data, y_data = generateXandY2D(input_fields_model, input_fields_obs, [], output_field_increment,
                                                        field_names, obs_field_names, [], output_fields,
                                                        start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
-                    # import matplotlib.pyplot as plt
-                    # plt.imshow(input_data[:,:,0, 2])
-                    # plt.show()
                 except Exception as e:
-                    print(F"Failed for {model_file_name}: {e}")
+                    # print(F"Failed for {model_file_name}: {e}")
                     continue
 
                 succ_attempts += 1
@@ -122,18 +118,16 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
                 # output_folder = config[TrainingParams.output_folder]
                 # # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
                 # viz_obj = EOAImageVisualizer(output_folder=join(output_folder, "training_imgs"), disp_images=False)
-                # viz_obj.plot_3d_data_np(np.rollaxis(np.rollaxis(X[0,:,:,:],3,0), 3, 1),
+                # viz_obj.plot_2d_data_np(np.rollaxis(X[0,:,:,:],2,0),
                 #                             var_names=[F"in_model_{x}" for x in field_names] +
                 #                                       [F"in_obs_{x}" for x in obs_field_names],
                 #                             flip_data=True,
-                #                             z_levels=[0, 1, 2, 3],
                 #                             file_name_prefix=F"{c_id}_{start_col}_{start_row}",
                 #                             title=F"")
                 #
-                # viz_obj.plot_3d_data_np(np.rollaxis(np.rollaxis(Y[0,:,:,:],3,0), 3, 1),
+                # viz_obj.plot_2d_data_np(np.rollaxis(Y[0,:,:,:],2,0),
                 #                         var_names=[F"out_model_{x}" for x in output_fields] ,
                 #                         flip_data=True,
-                #                         z_levels=[0, 1, 2, 3],
                 #                         file_name_prefix=F"{c_id}_{start_col}_{start_row}_out",
                 #                         title=F"")
 

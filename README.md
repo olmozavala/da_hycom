@@ -11,7 +11,8 @@ Files
 ### *0_ComputeMinMaxFromData*
 This file can read preprocessed or raw data and obtain the min, max
 and variance values for each of the fields specified in `PreprocConfig.py`.
-The outputs are saved in a `csv` file. 
+The outputs are saved in a `stats_obs.csv` and `stats_background.csv` file. 
+Important!!! you need to add **model** in the first line of both files in order to work. 
 
 ### *1_AnalizeData*
 This file is used to generate multiple plots from the raw data.

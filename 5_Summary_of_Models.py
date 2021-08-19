@@ -22,7 +22,7 @@ def changeDecimal(name):
     return name
 
 def buildSummary(name, loss, path):
-    model = [name, changeDecimal(getNetworkTypeTxt(name)), getBBOX(name), getInputFieldsTxt(name), getOutputFieldsTxt(name), loss, path, getId(name)]
+    model = [name, changeDecimal(getNetworkTypeTxt(name)), getBBOXandText(name)[2], getInputFieldsTxt(name), getOutputFieldsTxt(name), loss, path, getId(name)]
     return model
 
 def buildDF(summary):

@@ -196,71 +196,9 @@ def proc_model_data(np_fields, field_names, file_name):
     preproc_model_ds = addLatLon(preproc_model_ds, lats, lons, rows, cols)
     preproc_model_ds.to_netcdf(file_name)
 
-def compute_stats_from_raw():
-    """
-    We compute the mean and std for each field in the preproc config
-    :return:
-    """
-    preproc_config = get_preproc_config()
-    input_folder_background =   preproc_config[PreprocParams.input_folder_hycom]
-    input_folder_increment =    preproc_config[PreprocParams.input_folder_tsis]
-    input_folder_observations = preproc_config[PreprocParams.input_folder_obs]
-    output_stats_file = preproc_config[PreprocParams.output_stats_file]
-
-    background_fields = preproc_config[PreprocParams.fields_names]
-    increment_fields = background_fields
-    obs_fields = preproc_config[PreprocParams.fields_names_obs]
-
-    background_stats = {x:{'mean':0, 'std':0} for x in background_fields}
-    obs_stats = {x:{'mean':0, 'std':0} for x in obs_fields}
-
-    # --------- Reading all file names --------------
-    increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) if x.endswith('.a')])
-    increment_files.sort()
-
-    # --------- Preallocating ndarrays all file names --------------
-    z_layers = [0]
-    temp = read_hycom_fields(increment_files[0], increment_fields, z_layers) # Only in the surfacek
-    dims = temp[increment_fields[0]].shape
-    increment_data = {x:np.zeros([len(increment_files), dims[1], dims[2]]) for x in increment_fields}
-    obs_data = {x:np.zeros([len(increment_files),  dims[1], dims[2]]) for x in obs_fields}
-
-    # Filling arrays with data
-    for f_idx, c_file in enumerate(increment_files):
-        print(F"Working with file: {c_file}")
-        # Finding corresponding observation file
-        sp_name = c_file.split("/")[-1].split(".")[1]
-        c_datetime = datetime.strptime(sp_name, "%Y_%j_18")
-        obs_file  = join(input_folder_observations, F"tsis_obs_gomb4_{c_datetime.strftime('%Y%m%d')}00.nc")
-        assert os.path.exists(obs_file)
-
-        temp = read_hycom_fields(c_file, increment_fields, z_layers) # Only in the surfacek
-        for c_field in increment_fields:
-            increment_data[c_field][f_idx, :, :] = temp[c_field]
-
-        temp = read_netcdf(obs_file, obs_fields, z_layers)
-        for c_field in obs_fields:
-            obs_data[c_field][f_idx, :, :] = temp[c_field][:]
-
-    # Computing and storing the statistics
-    for c_field in increment_fields:
-        background_stats[c_field]['mean'] = np.nanmean(increment_data[c_field][f_idx, :, :])
-        background_stats[c_field]['std'] = np.nanstd(increment_data[c_field][f_idx, :, :])
-
-    for c_field in obs_fields:
-        obs_stats[c_field]['mean'] = np.nanmean(obs_data[c_field][f_idx, :, :])
-        obs_stats[c_field]['std'] = np.nanstd(obs_data[c_field][f_idx, :, :])
-
-    # Saving the statistics
-    df = pd.DataFrame(background_stats)
-    df.to_csv(F"{output_stats_file}_background.csv")
-    df = pd.DataFrame(obs_stats)
-    df.to_csv(F"{output_stats_file}_obs.csv")
-    print("Done! yeah finally!")
 
 if __name__ == '__main__':
     # ----------- Parallel -------
     # p = Pool(NUM_PROC)
     # p.map(preproc_data, range(NUM_PROC))
-    # preproc_data(0)
-    compute_stats_from_raw()
+    preproc_data(0)

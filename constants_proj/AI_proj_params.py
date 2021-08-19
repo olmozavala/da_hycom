@@ -62,6 +62,7 @@ class ProjTrainingParams(Enum):
     norm_type = 14
     network_type = 15 # Indicates which network to use`
     output_folder_summary_models = 16  # Where to output the data
+    perc_ocean = 17  # If we want to restrict the percentage of ocean to use while training
 
 class PredictionParams(Enum):
     input_folder = 1  # Where the images are stored

@@ -78,12 +78,9 @@ def getId(name):
     sections = name.split("_")
     return sections[0]
 
-def getBBOX(name):
-    if "160x160" in name:
-        return "160x160"
-    if "80x80" in name:
-        return "80x80"
-    return "Unknown"
+def getBBOXandText(name):
+    bbox = name.split("_")[-6].split("x")
+    return int(bbox[0]), int(bbox[1]), F"{bbox[0]}x{bbox[1]}"
 
 def landperc(name):
     if "no_land" in name.lower():

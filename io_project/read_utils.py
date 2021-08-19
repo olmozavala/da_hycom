@@ -137,7 +137,8 @@ def normalizeData(data, field_name, data_type = PreprocParams.type_model, norm_t
         if type(output_data) is np.ndarray:
             return output_data
         else:
-            return output_data.filled(np.nan)
+            # return output_data.filled(np.nan)
+            return output_data.data
 
 # if norm_type == PreprocParams.mean_var:
     #     df = pd.read_csv("MIN_MAX_MEAN_STD_FINAL.csv")
@@ -296,7 +297,7 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
 
     # ******* Adding the observations fields for input ********
     for c_field in obs_field_names:
-        temp_data = input_fields_obs[c_field][start_row:end_row, start_col:end_col]
+        temp_data = input_fields_obs[c_field][start_row:end_row, start_col:end_col].data.astype(np.float64)
         input_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_obs,
                                                    norm_type=norm_type, normalize=True)
         # input_data[:, :, id_field] = temp_data

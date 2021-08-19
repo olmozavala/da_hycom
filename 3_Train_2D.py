@@ -4,6 +4,8 @@ from config.PreprocConfig import get_preproc_config
 from AI.data_generation.GeneratorRaw2D import data_gen_from_raw
 
 from constants_proj.AI_proj_params import ProjTrainingParams, ParallelParams, NetworkTypes, PreprocParams
+from constants.AI_params import TrainingParams, ModelParams, AiModels
+
 import trainingutils as utilsNN
 # import models.modelBuilder3D as model_builder
 from models.modelSelector import select_2d_model
@@ -19,7 +21,7 @@ from constants.AI_params import TrainingParams, ModelParams
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras.layers import LeakyReLU
 
-def doTraining(conf):
+def doTraining(config):
     preproc_config = get_preproc_config()
     input_folder_increment =    preproc_config[PreprocParams.input_folder_tsis]
 
@@ -57,7 +59,7 @@ def doTraining(conf):
     [train_ids, val_ids, test_ids] = utilsNN.split_train_validation_and_test(tot_examples,
                                                                              val_percentage=val_perc,
                                                                              test_percentage=test_perc,
-                                                                             shuffle_ids=False)
+                                                                             shuffle_ids=True)
 
     print(F"Train examples (total:{len(train_ids)}) :{files_to_read[train_ids]}")
     print(F"Validation examples (total:{len(val_ids)}) :{files_to_read[val_ids]}:")
@@ -88,8 +90,9 @@ def doTraining(conf):
 
     print("Training ...")
     # # ----------- Using preprocessed data -------------------
-    generator_train = data_gen_from_raw(config, preproc_config, train_ids, fields, fields_obs, output_fields)
-    generator_val = data_gen_from_raw(config, preproc_config, val_ids, fields, fields_obs, output_fields)
+    examples_per_figure = config[TrainingParams.batch_size]
+    generator_train = data_gen_from_raw(config, preproc_config, train_ids, fields, fields_obs, output_fields, examples_per_figure=examples_per_figure)
+    generator_val = data_gen_from_raw(config, preproc_config, val_ids, fields, fields_obs, output_fields, examples_per_figure=1)
 
     model.fit_generator(generator_train, steps_per_epoch=min(1000, len(train_ids)),
                         validation_data=generator_val,
@@ -100,51 +103,75 @@ def doTraining(conf):
                         # validation_freq=10, # How often to compute the validation loss
                         epochs=epochs, callbacks=[logger, save_callback, stop_callback])
 
+def multipleRuns(config, start_i, N, bboxes, network_types, network_names, perc_ocean):
+    orig_name = config[TrainingParams.config_name]
+    depth = len(config[ProjTrainingParams.fields_names]) + len(config[ProjTrainingParams.fields_names_obs]) + len(config[ProjTrainingParams.fields_names_var])
+    config[ModelParams.INPUT_SIZE][2] = depth
+
+    print(" --------------- Testing different bbox selections -------------------")
+    local_name = orig_name.replace("OUTPUT", "OUT_SRFHGT")
+    for i in range(N):
+        for j, net_type_id in enumerate(network_types):
+            for c_bbox in bboxes:
+                for c_perc_ocean in perc_ocean:
+                    local_name = local_name.replace("RUN", F"{(i+start_i):04d}")
+                    # Set network to use
+                    local_name = local_name.replace("NETWORK", network_names[j])
+                    config[ProjTrainingParams.network_type] = net_type_id
+                    # Set bbox to use
+                    local_name = local_name.replace("ROWS", str(c_bbox[0]))
+                    local_name = local_name.replace("COLS", str(c_bbox[1]))
+                    input_size = config[ModelParams.INPUT_SIZE]
+                    input_size[0] = c_bbox[0]
+                    input_size[1] = c_bbox[1]
+                    config[ModelParams.INPUT_SIZE] = input_size
+                    # Set perc ocean
+                    local_name = local_name.replace("PERCOCEAN", F"PERCOCEAN_{c_perc_ocean}")
+                    config[ProjTrainingParams.perc_ocean] = c_perc_ocean
+                    # Changing the number of images generated per example to improve speed
+                    if c_bbox[0] == 80 or c_bbox[0] == 160:
+                        config[TrainingParams.batch_size] = 10
+                    else:
+                        config[TrainingParams.batch_size] = 1
+
+                    print(F"Final local_name: {local_name}")
+                    config[TrainingParams.config_name] = local_name
+                    doTraining(config)
 
 if __name__ == '__main__':
-    config = get_training()
+    orig_config = get_training()
     # Single training
-    doTraining(config)
+    # doTraining(orig_config)
 
-    # ====================================================================
-    # ====================== Multiple trainings ==========================
-    # ====================================================================
+    bboxes = [[160, 160]]
+    perc_ocean = [.95]
+    network_types = [NetworkTypes.UNET]
+    network_names = ["NET_2DUNET"]
+    multipleRuns(orig_config, 0, 1, bboxes, network_types, network_names, perc_ocean)
 
-    # orig_name = config[TrainingParams.config_name]
-    # depth = len(config[ProjTrainingParams.fields_names]) + len(config[ProjTrainingParams.fields_names_obs]) + len(config[ProjTrainingParams.fields_names_var])
-    # config[ModelParams.INPUT_SIZE][2] = depth
-    #
-    # start_i = 0
+    # # ====================================================================
+    # # ====================== Multiple trainings ==========================
+    # # ====================================================================
+    # start_i = 0 # When to start (if we already have some runs)
     # N = 5  # How many networks we want to run for each experiment
     #
-    # # ========== Testing Network architecture =================
-    # # print(" --------------- Testing different architectures -------------------")
-    # # network_types = [NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
-    # # network_types_names = ["SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
+    # # ========== Testing BBOX options =================
+    # bboxes = [[80,80], [160,160], [384,520]]
+    # perc_ocean = [0]
+    # network_types = [NetworkTypes.UNET]
+    # network_names = ["NET_2DUNET"]
+    # multipleRuns(orig_config, start_i, N, bboxes, network_types, network_names, perc_ocean)
     #
-    # # local_name = orig_name.replace("OUTPUT", "OUT_SRFHGT")
-    # # for i in range(N):
-    # #     run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
-    # #     for i, net_type_id in enumerate(network_types):
-    # #         config[TrainingParams.config_name] = run_name.replace("NETWORK", F"NET_{network_types_names[i]}")
-    # #         print(config[TrainingParams.config_name])
-    # #         config[ProjTrainingParams.network_type] = net_type_id
-    # #         doTraining(config)
+    # # ========== Testing Types of NN options =================
+    # bboxes = [[160,160]]
+    # perc_ocean = [0]
+    # network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
+    # network_names = ["NET_2DUNET", "SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
+    # multipleRuns(orig_config, start_i, N, bboxes, network_types, network_names, perc_ocean)
     #
-    # # ========== Changing output variable =================
-    # print(" --------------- Testing output variables -------------------")
-    # # In this case it is always a UNET
-    # local_name = orig_name.replace("NETWORK", "NET_UNET")
-    # # output_fields = ['srfhgt', 'temp', 'salin', 'u-vel.', 'v-vel.']
-    # output_fields = ['srfhgt']
-    # config[ProjTrainingParams.network_type] = NetworkTypes.UNET
-    # input_size = config[ModelParams.INPUT_SIZE]
-    # for out_field in output_fields:
-    #     for i in range(N):
-    #         run_name = local_name.replace("RUN", F"{(i+start_i):04d}")
-    #         run_name = run_name.replace("ROWS", str(input_size[0]))
-    #         run_name = run_name.replace("COLS", str(input_size[1]))
-    #         config[TrainingParams.config_name] = run_name.replace("OUTPUT", F"OUT_{out_field.upper()}")
-    #         config[ProjTrainingParams.output_fields] = [out_field]
-    #         doTraining(config)
-    #         print(config[TrainingParams.config_name])
+    # # ========== Testing perc of oceans =================
+    # bboxes = [[160,160]]
+    # perc_ocean = [0, .5, .9]
+    # network_types = [NetworkTypes.UNET]
+    # network_names = ["NET_2DUNET"]
+    # multipleRuns(orig_config, start_i, N, bboxes, network_types, network_names, perc_ocean)

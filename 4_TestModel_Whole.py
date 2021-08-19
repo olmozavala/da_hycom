@@ -2,7 +2,7 @@ import os
 from io_project.read_utils import generateXandY2D, normalizeData
 
 from tensorflow.keras.utils import plot_model
-from inout.io_netcdf import read_netcdf
+from inout.io_netcdf import read_netcdf, read_netcdf_xr
 from os.path import join
 import numpy as np
 import pandas as pd
@@ -25,21 +25,16 @@ from sklearn.metrics import mean_squared_error
 from ExtraUtils.NamesManipulation import *
 from eoas_utils.VizUtilsProj import chooseCMAP, getMinMaxPlot
 
-# Rows and Columns to use
-gcols = 1400
-grows = 888
-
-
-
 def main():
 
     config = get_prediction_params()
     # -------- For single model testing --------------
-    test_model(config)
+    # print("Testing single model....")
+    # test_model(config)
 
     # -------- For all summary model testing --------------
+    print("Testing all the models inside summary.csv ....")
     summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
-    # summary_file = "/home/data/MURI/output/SUMMARY/summary.csv"
     df = pd.read_csv(summary_file)
 
     for model_id in range(len(df)):
@@ -60,12 +55,14 @@ def main():
         # config[ProjTrainingParams.fields_names_obs] = obs_fields
         config[ProjTrainingParams.fields_names_var] = var_fields
         # Setting BBOX
+        grows, gcols, bboxtxt = getBBOXandText(name)
         config[ModelParams.INPUT_SIZE][0] = grows
         config[ModelParams.INPUT_SIZE][1] = gcols
         config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(var_fields)
         # Setting output vars
         output_fields = getOutputFields(name)
-        config[ProjTrainingParams.output_fields] = output_fields
+        # config[ProjTrainingParams.output_fields] = output_fields
+        config[ProjTrainingParams.output_fields] = ['srfhgt']
         # Setting model weights file
         config[PredictionParams.model_weights_file] = model["Path"]
         print(F"Model's weight file: {model['Path']}")
@@ -74,7 +71,8 @@ def main():
         config[TrainingParams.config_name] = run_name
         test_model(config)
 
-    # In this case we test all the best models
+
+def makePrediction():
 
 def test_model(config):
     input_folder = config[PredictionParams.input_folder]
@@ -134,9 +132,7 @@ def test_model(config):
     cmap_model = chooseCMAP(field_names)
     cmap_obs = chooseCMAP(obs_field_names)
     cmap_std = chooseCMAP(field_names_std)
-
-    tot_rows = 891
-    tot_cols = 1401
+    cmap_error = chooseCMAP("error")
 
     start_row = 384 - rows  # These hardcoded numbers come from the specific size of these files
     start_col = 525 - cols
@@ -156,7 +152,7 @@ def test_model(config):
 
         # *********************** Reading files **************************
         input_fields_model = read_hycom_fields(model_file_name, field_names, z_layers)
-        input_fields_obs = read_netcdf(obs_file_name, obs_field_names, z_layers)
+        input_fields_obs = read_netcdf_xr(obs_file_name, obs_field_names, z_layers)
         output_field_increment = read_hycom_fields(increment_file_name, output_fields, z_layers)
 
         # ******************* Normalizing and Cropping Data *******************
@@ -179,7 +175,7 @@ def test_model(config):
         X = np.expand_dims(input_data, axis=0)
         Y = np.expand_dims(y_data, axis=0)
 
-        # Make the prediction of the network
+        #=====================  Make the prediction of the network =======================
         start = time.time()
         output_nn_original = model.predict(X, verbose=1)
         toc = time.time() - start
@@ -201,8 +197,8 @@ def test_model(config):
         # Remove the 'extra dimension'
         denorm_cnn_output = np.squeeze(denorm_cnn_output)
         denorm_y = np.squeeze(denorm_y)
-        whole_cnn = denorm_cnn_output# Add the the 'whole prediction'
-        whole_y = denorm_y # Add the the 'whole prediction'
+        whole_cnn = denorm_cnn_output# Add to the 'whole prediction'
+        whole_y = denorm_y # Add to the 'whole prediction'
 
         if len(denorm_cnn_output.shape) == 2: # In this case we only had one output and we need to make it 'array' to plot
             denorm_cnn_output = np.expand_dims(denorm_cnn_output, axis=2)
@@ -213,7 +209,6 @@ def test_model(config):
         # for i in range(len(output_fields)):
         #     ocean_indexes = np.logical_not(np.isnan(denorm_y[:,:,i]))
         #     rmse_cnn[i] = np.sqrt(mean_squared_error(denorm_cnn_output[:,:,i][ocean_indexes], denorm_y[:,:,i][ocean_indexes]))
-
 
         # ================== DISPLAYS ALL INPUTS AND OUTPUTS DENORMALIZED ===================
         # Adding back mask to all the input variables
@@ -227,9 +222,9 @@ def test_model(config):
         maxcbarerror = np.nanmax(error)
         no_zero_ids = np.count_nonzero(whole_cnn)
 
-        if output_fields[0] == 'srfhgt': # This should only be for SSH to adjust the units
-            whole_cnn /= 9.81
-            whole_y = np.array(whole_y)/9.81
+        # if output_fields[0] == 'srfhgt': # This should only be for SSH to adjust the units
+        #     whole_cnn /= 9.81
+        #     whole_y = np.array(whole_y)/9.81
 
         rmse_cnn = np.sqrt( np.nansum( (whole_y - whole_cnn)**2 )/no_zero_ids)
 
@@ -242,18 +237,21 @@ def test_model(config):
             # viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
             viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False)
 
+            diff = denorm_y.swapaxes(0,2) - denorm_cnn_output.swapaxes(0,2)
             # viz_obj.plot_2d_data_np_raw(np.concatenate((input_data.swapaxes(0,2), Y[0,:,:,:].swapaxes(0,2), output_nn_original[0,:,:,:].swapaxes(0,2))),
-            viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_input.swapaxes(0,2), denorm_y.swapaxes(0,2), denorm_cnn_output.swapaxes(0,2))),
+            viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_input.swapaxes(0,2), denorm_y.swapaxes(0,2), denorm_cnn_output.swapaxes(0,2), diff)),
                                         var_names=[F"in_model_{x}" for x in field_names] +
                                                   [F"in_obs_{x}" for x in obs_field_names] +
                                                   [F"in_var_{x}" for x in field_names_std] +
                                                   [F"out_inc_{x}" for x in output_fields] +
-                                                  [F"cnn_{x}" for x in output_fields],
+                                                  [F"cnn_{x}" for x in output_fields] +
+                                                  [F"error"],
                                         file_name=F"Global_Input_and_CNN_{sp_name}",
                                         rot_90=True,
-                                        cmap=cmap_model+cmap_obs+cmap_std+cmap_out+cmap_out,
+                                        cmap=cmap_model+cmap_obs+cmap_std+cmap_out+cmap_out+cmap_error,
                                         cols_per_row=len(field_names),
-                                        title=F"Input data: {field_names} and obs {obs_field_names}, increment {output_fields}, cnn {output_fields}")
+                                        # title=F"Input data: {field_names} and obs {obs_field_names}, increment {output_fields}, cnn {output_fields}")
+                                        title=F"RMSE {rmse_cnn:0.3f} m {sp_name}")
 
             # # ================== Displays CNN and TSIS with RMSE ================
             # minmax = getMinMaxPlot(output_fields)[0]
