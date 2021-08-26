@@ -24,14 +24,14 @@ _maxlat = 31.9267
 _maxlon = -56.08
 
 # # Here we identify lat and lons before hand. TODO improve this making it local to functions
-# coords_file = "/data/HYCOM/DA_HYCOM_TSIS/preproc/coords/regional.grid.a"
-# # coord_fields = [ 'plon','plat','qlon','qlat','ulon','ulat','vlon','vlat']
-# coord_fields = ['plon','plat']
-# print("Reading hycom coordinates....")
-# hycom_coords = read_hycom_coords(coords_file, coord_fields)
-# _lats = hycom_coords['plat'][:,0]
-# _lons = hycom_coords['plon'][0,:]
-# print("Done!")
+coords_file = "/data/HYCOM/DA_HYCOM_TSIS/preproc/coords/regional.grid.a"
+# coord_fields = [ 'plon','plat','qlon','qlat','ulon','ulat','vlon','vlat']
+coord_fields = ['plon','plat']
+print("Reading hycom coordinates....")
+hycom_coords = read_hycom_coords(coords_file, coord_fields)
+_lats = hycom_coords['plat'][:,0]
+_lons = hycom_coords['plon'][0,:]
+print("Done!")
 
 def preproc_data(proc_id):
     """

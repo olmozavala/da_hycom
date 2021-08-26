@@ -39,7 +39,6 @@ def main():
 
     for model_id in range(len(df)):
         model = df.iloc[model_id]
-
         # Setting Network type (only when network type is UNET)
         name = model["Name"]
         network_arch, network_type = getNeworkArchitectureAndTypeFromName(getNetworkTypeTxt(name))
@@ -48,9 +47,13 @@ def main():
         # Setting input vars
         # model_fields, obs_fields, var_fields = getInputFields(name)
         var_fields = getInputVarFields(name)
-        model_fields = config[ProjTrainingParams.fields_names]
-        obs_fields = config[ProjTrainingParams.fields_names_obs]
-        print(F"Input fields: {model_fields}, {obs_fields}, {var_fields}")
+        model_fields = getInputFields(name)
+        config[ProjTrainingParams.fields_names] = model_fields
+        obs_fields = getObsFieldsTxt(name)
+        config[ProjTrainingParams.fields_names_obs] = obs_fields
+        comp_fields = getCompostieFields(name)
+        config[ProjTrainingParams.fields_names_composite] = comp_fields
+        print(F"Input fields: {model_fields}, {obs_fields}, {var_fields}, {comp_fields}")
         # config[ProjTrainingParams.fields_names] = model_fields
         # config[ProjTrainingParams.fields_names_obs] = obs_fields
         config[ProjTrainingParams.fields_names_var] = var_fields
@@ -58,21 +61,20 @@ def main():
         grows, gcols, bboxtxt = getBBOXandText(name)
         config[ModelParams.INPUT_SIZE][0] = grows
         config[ModelParams.INPUT_SIZE][1] = gcols
-        config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(var_fields)
+        config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(var_fields) + len(comp_fields)
+        config[ProjTrainingParams.rows] = grows
+        config[ProjTrainingParams.cols] = gcols
         # Setting output vars
-        output_fields = getOutputFields(name)
+        # output_fields = getOutputFields(name)
         # config[ProjTrainingParams.output_fields] = output_fields
         config[ProjTrainingParams.output_fields] = ['srfhgt']
         # Setting model weights file
-        config[PredictionParams.model_weights_file] = model["Path"]
-        print(F"Model's weight file: {model['Path']}")
+        config[PredictionParams.model_weights_file] = join(model["Path"],model["Name"])
+        print(F"Model's weight file: {config[PredictionParams.model_weights_file]}")
         # Set the name of the network
-        run_name = name.replace(".hdf5", "")
+        run_name = model["Path"].replace("/models","").split("/")[-1]  # The runname
         config[TrainingParams.config_name] = run_name
         test_model(config)
-
-
-def makePrediction():
 
 def test_model(config):
     input_folder = config[PredictionParams.input_folder]
@@ -81,6 +83,7 @@ def test_model(config):
     model_weights_file = config[PredictionParams.model_weights_file]
     output_imgs_folder = config[PredictionParams.output_imgs_folder]
     field_names = config[ProjTrainingParams.fields_names]
+    comp_field_names = config[ProjTrainingParams.fields_names_composite]
     obs_field_names = config[ProjTrainingParams.fields_names_obs]
     rows = config[ProjTrainingParams.rows]
     cols = config[ProjTrainingParams.cols]
@@ -128,23 +131,46 @@ def test_model(config):
     else:
         input_fields_std = []
 
+    # Selects the min max color values
+    cminmax_out = getMinMaxCbar(output_fields)
+    # cminmax_model = getMinMaxCbar(field_names)
+    cminmax_model = getMinMaxCbar(["" for x in field_names])
+    cminmax_obs = getMinMaxCbar(obs_field_names)
+    cminmax_comp = getMinMaxCbar(comp_field_names)
+    cminmax_std = getMinMaxCbar(field_names_std)
+    cminmax_error = getMinMaxCbar(["error"])
+
+    # Selects the colormap to use for each field
     cmap_out = chooseCMAP(output_fields)
     cmap_model = chooseCMAP(field_names)
+    cmap_comp = chooseCMAP(comp_field_names)
     cmap_obs = chooseCMAP(obs_field_names)
     cmap_std = chooseCMAP(field_names_std)
-    cmap_error = chooseCMAP("error")
+    cmap_error = chooseCMAP(["error"])
 
-    start_row = 384 - rows  # These hardcoded numbers come from the specific size of these files
-    start_col = 525 - cols
+    # Selects the colormap label to use for each field
+    cmap_label_out = getFieldUnits(output_fields)
+    cmap_label_model = getFieldUnits(field_names)
+    cmap_label_comp = getFieldUnits(comp_field_names)
+    cmap_label_obs = getFieldUnits(obs_field_names)
+    cmap_label_std = getFieldUnits(field_names_std)
+    cmap_label_error = getFieldUnits(["error"])
 
     all_whole_mean_times = []
     all_whole_sum_times = []
     all_whole_rmse = []
 
-    for id_file, c_file in enumerate(increment_files):
+    tot_rows = 384
+    tot_cols = 525
+
+    start_test_idx = 583+73
+
+    for id_file, c_file in enumerate(increment_files[start_test_idx:]):
         # Find current and next date
         sp_name = c_file.split("/")[-1].split(".")[1]
         c_datetime = datetime.strptime(sp_name, "%Y_%j_18")
+        day_of_year = c_datetime.timetuple().tm_yday
+        print(F"=================== Day of year {day_of_year} ==========================")
 
         model_file_name = join(input_folder_background, F"020_archv.{c_datetime.strftime('%Y_%j')}_18.a")
         increment_file_name = c_file
@@ -161,8 +187,9 @@ def test_model(config):
         try:
             perc_ocean = 0
             input_data, y_data = generateXandY2D(input_fields_model, input_fields_obs, input_fields_std, output_field_increment,
-                                                 field_names, obs_field_names, field_names_std, output_fields,
-                                                 start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
+                                                 field_names+comp_field_names, obs_field_names, field_names_std, output_fields,
+                                                 0, 0, tot_rows, tot_cols, norm_type=norm_type, perc_ocean=perc_ocean)
+                                                # start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
         except Exception as e:
             print(F"Exception {e}")
 
@@ -171,87 +198,84 @@ def test_model(config):
         input_data_nans = np.isnan(input_data)
         input_data = np.nan_to_num(input_data, nan=0)
         y_data = np.nan_to_num(y_data, nan=-0.5)
+        cnn_output = np.zeros(y_data.shape)
 
-        X = np.expand_dims(input_data, axis=0)
-        Y = np.expand_dims(y_data, axis=0)
+        # Make predictions of all the domain
+        for c_row in range(0, tot_rows, rows):
+            for c_col in range(0, tot_cols, cols):
+                # This part fills the whole domain, but most of the time the last row and cols are computed twice
+                if c_row + rows >= tot_rows:
+                    s_row = tot_rows-rows
+                else:
+                    s_row = c_row
+                if c_col + cols >= tot_cols:
+                    s_col = tot_cols-cols
+                else:
+                    s_col = c_col
 
-        #=====================  Make the prediction of the network =======================
-        start = time.time()
-        output_nn_original = model.predict(X, verbose=1)
-        toc = time.time() - start
-        this_file_times.append(toc)
+                print(F"{s_row}:{s_row+rows}, {s_col}:{s_col+cols}")
+                X = np.expand_dims(input_data[s_row:s_row+rows, s_col:s_col+cols,:], axis=0)
+                Y = np.expand_dims(y_data[s_row:s_row+rows, s_col:s_col+cols,:], axis=0)
 
-        # Make nan all values inside the land
-        land_indexes = Y == -0.5
-        output_nn_original[land_indexes] = np.nan
+                #=====================  Make the prediction of the network =======================
+                start = time.time()
+                output_nn_original = model.predict(X, verbose=1)
+                toc = time.time() - start
+                this_file_times.append(toc)
 
-        # ==== Denormalizingallinput and outputs
-        denorm_cnn_output = denormalizeData(output_nn_original, output_fields, PreprocParams.type_inc, norm_type)
-        denorm_y = denormalizeData(Y, output_fields, PreprocParams.type_inc, norm_type)
-        input_types = [PreprocParams.type_model for i in input_fields_model] + [PreprocParams.type_obs for i in input_fields_obs] + [PreprocParams.type_std for i in input_fields_std]
-        denorm_input = denormalizeData(input_data, field_names+obs_field_names+field_names_std, input_types, norm_type)
+                # Make nan all values inside the land
+                land_indexes = Y == -0.5
+                output_nn_original[land_indexes] = np.nan
+
+                cnn_output[s_row:s_row+rows, s_col:s_col+cols] = output_nn_original[0,:,:,:]
+
+        # ==== Denormalizing all input and outputs
+        denorm_cnn = denormalizeData(cnn_output, output_fields, PreprocParams.type_inc, norm_type)
+        denorm_y = denormalizeData(y_data, output_fields, PreprocParams.type_inc, norm_type)
+        input_types = [PreprocParams.type_model for i in field_names+comp_field_names] + [PreprocParams.type_obs for i in obs_field_names] + [PreprocParams.type_std for i in field_names_std]
+        denorm_input = denormalizeData(input_data, field_names+comp_field_names+obs_field_names+field_names_std, input_types, norm_type)
 
         # Recover the original land areas, they are lost after denormalization
+        land_indexes = y_data == -0.5
         denorm_y[land_indexes] = np.nan
 
-        # Remove the 'extra dimension'
-        denorm_cnn_output = np.squeeze(denorm_cnn_output)
-        denorm_y = np.squeeze(denorm_y)
-        whole_cnn = denorm_cnn_output# Add to the 'whole prediction'
-        whole_y = denorm_y # Add to the 'whole prediction'
-
-        if len(denorm_cnn_output.shape) == 2: # In this case we only had one output and we need to make it 'array' to plot
-            denorm_cnn_output = np.expand_dims(denorm_cnn_output, axis=2)
-            denorm_y = np.expand_dims(denorm_y, axis=2)
-
-        # Compute RMSE
-        # rmse_cnn = np.zeros(len(output_fields))
-        # for i in range(len(output_fields)):
-        #     ocean_indexes = np.logical_not(np.isnan(denorm_y[:,:,i]))
-        #     rmse_cnn[i] = np.sqrt(mean_squared_error(denorm_cnn_output[:,:,i][ocean_indexes], denorm_y[:,:,i][ocean_indexes]))
-
-        # ================== DISPLAYS ALL INPUTS AND OUTPUTS DENORMALIZED ===================
         # Adding back mask to all the input variables
         denorm_input[input_data_nans] = np.nan
 
-        # ======= Plots whole output with RMSE
-        mincbar = np.nanmin(whole_y)
-        maxcbar = np.nanmax(whole_y)
-        error = whole_y - whole_cnn
-        mincbarerror = np.nanmin(error)
-        maxcbarerror = np.nanmax(error)
-        no_zero_ids = np.count_nonzero(whole_cnn)
+        error = denorm_y - denorm_cnn
+        no_zero_ids = np.count_nonzero(np.logical_not(np.isnan(cnn_output)))
 
-        # if output_fields[0] == 'srfhgt': # This should only be for SSH to adjust the units
-        #     whole_cnn /= 9.81
-        #     whole_y = np.array(whole_y)/9.81
-
-        rmse_cnn = np.sqrt( np.nansum( (whole_y - whole_cnn)**2 )/no_zero_ids)
+        rmse_cnn = np.sqrt( np.nansum( (denorm_y - denorm_cnn)**2 )/no_zero_ids)
+        mae_cnn = np.nansum( np.abs(denorm_y - denorm_cnn))/no_zero_ids
 
         all_whole_rmse.append(rmse_cnn)
         all_whole_mean_times.append(np.mean(np.array(this_file_times)))
         all_whole_sum_times.append(np.sum(np.array(this_file_times)))
 
-        # if day_of_year == 353: # Plot 10% of the times
+        # if day_of_year%30 == 0: # Plot 10% of the times
         if True: # Plot 10% of the times
             # viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
-            viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False)
+            viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
+                                         mincbar=cminmax_model[0]+cminmax_comp[0]+cminmax_obs[0]+cminmax_std[0]+cminmax_out[0]+cminmax_out[0]+cminmax_error[0],
+                                         maxcbar=cminmax_model[1]+cminmax_comp[1]+cminmax_obs[1]+cminmax_std[1]+cminmax_out[1]+cminmax_out[1]+cminmax_error[1])
 
-            diff = denorm_y.swapaxes(0,2) - denorm_cnn_output.swapaxes(0,2)
             # viz_obj.plot_2d_data_np_raw(np.concatenate((input_data.swapaxes(0,2), Y[0,:,:,:].swapaxes(0,2), output_nn_original[0,:,:,:].swapaxes(0,2))),
-            viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_input.swapaxes(0,2), denorm_y.swapaxes(0,2), denorm_cnn_output.swapaxes(0,2), diff)),
+            viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_input.swapaxes(0,2), denorm_y.swapaxes(0,2), denorm_cnn.swapaxes(0,2), error.swapaxes(0,2))),
                                         var_names=[F"in_model_{x}" for x in field_names] +
+                                                  [F"in_comp_{x}" for x in comp_field_names] +
                                                   [F"in_obs_{x}" for x in obs_field_names] +
                                                   [F"in_var_{x}" for x in field_names_std] +
-                                                  [F"out_inc_{x}" for x in output_fields] +
+                                                  [F"out_inc_{x} MAE ({np.nanmean(np.abs(denorm_y[:,:,i])):0.2f})" for i,x in enumerate(output_fields)] +
                                                   [F"cnn_{x}" for x in output_fields] +
-                                                  [F"error"],
+                                                  [F"Difference RMSE {rmse_cnn:0.4f} MAE {mae_cnn:0.4f}"],
                                         file_name=F"Global_Input_and_CNN_{sp_name}",
                                         rot_90=True,
-                                        cmap=cmap_model+cmap_obs+cmap_std+cmap_out+cmap_out+cmap_error,
-                                        cols_per_row=len(field_names),
+                                        cmap=cmap_model+cmap_comp+cmap_obs+cmap_std+cmap_out+cmap_out+cmap_error,
+                                        cmap_labels=cmap_label_model+cmap_label_comp+cmap_label_obs+cmap_label_std+cmap_label_out+cmap_label_out+cmap_label_error,
+                                        # cols_per_row=len(field_names),
+                                        cols_per_row=4,
                                         # title=F"Input data: {field_names} and obs {obs_field_names}, increment {output_fields}, cnn {output_fields}")
-                                        title=F"RMSE {rmse_cnn:0.3f} m {sp_name}")
+                                        title=F"RMSE {rmse_cnn:0.4f} m {sp_name}")
 
             # # ================== Displays CNN and TSIS with RMSE ================
             # minmax = getMinMaxPlot(output_fields)[0]
@@ -265,7 +289,7 @@ def test_model(config):
             #
             # error_cmap = cmocean.cm.diff
             # viz_obj.output_folder = join(output_imgs_folder,'WholeOutput_CNN_TSIS')
-            # viz_obj.plot_2d_data_np_raw([np.flip(whole_cnn, axis=0), np.flip(whole_y, axis=0), np.flip(error, axis=0)],
+            # viz_obj.plot_2d_data_np_raw([np.flip(cnn_output, axis=0), np.flip(y_data, axis=0), np.flip(error, axis=0)],
             #                             # var_names=[F"CNN INC {x}" for x in output_fields] + [F"TSIS INC {x}" for x in output_fields] + [F'TSIS - CNN (Mean RMSE {rmse_cnn:0.4f} m)'],
             #                             var_names=[F"CNN increment SSH" for x in output_fields] + [F"TSIS increment SSH" for x in output_fields] + [F'TSIS - CNN \n (Mean RMSE {rmse_cnn:0.4f} m)'],
             #                             file_name=F"Global_WholeOutput_CNN_TSIS_{c_file}",
@@ -277,13 +301,61 @@ def test_model(config):
 
             print("DONE ALL FILES!!!!!!!!!!!!!")
     dic_summary = {
-        "File": increment_files,
+        "File": increment_files[start_test_idx:],
         "rmse": all_whole_rmse,
         "times mean": all_whole_mean_times,
         "times sum": all_whole_sum_times,
     }
     df = pd.DataFrame.from_dict(dic_summary)
     df.to_csv(join(output_imgs_folder, "Global_RMSE_and_times.csv"))
+
+
+def getFieldUnits(fields):
+    cmaps_fields = []
+    degree_sign = u"\N{DEGREE SIGN}"
+    for c_field in fields:
+        if c_field == "srfhgt" or c_field == "ssh":
+            cmaps_fields.append("meters")
+        elif c_field == "temp" or c_field == "sst" or c_field == "temp":
+            cmaps_fields.append(F"{degree_sign}C")
+        elif c_field == "salin" or c_field == "sss" or c_field == "sal":
+            cmaps_fields.append("?")
+        elif c_field == "u-vel.":
+            cmaps_fields.append("m/s")
+        elif c_field == "v-vel.":
+            cmaps_fields.append("m/s")
+        elif c_field == "error":
+            cmaps_fields.append("")
+        else:
+            cmaps_fields.append("")
+    return cmaps_fields
+
+def getMinMaxCbar(fields):
+    mincbar = []
+    maxcbar = []
+    for c_field in fields:
+        if c_field == "srfhgt" or c_field == "ssh":
+            maxcbar.append(.2)
+            mincbar.append(-.2)
+        elif c_field == "temp" or c_field == "sst" or c_field == "temp":
+            maxcbar.append(np.nan)
+            mincbar.append(np.nan)
+        elif c_field == "salin" or c_field == "sss" or c_field == "sal":
+            maxcbar.append(np.nan)
+            mincbar.append(np.nan)
+        elif c_field == "u-vel.":
+            maxcbar.append(np.nan)
+            mincbar.append(np.nan)
+        elif c_field == "v-vel.":
+            maxcbar.append(np.nan)
+            mincbar.append(np.nan)
+        elif c_field == "error":
+            maxcbar.append(np.nan)
+            mincbar.append(np.nan)
+        else:
+            maxcbar.append(np.nan)
+            mincbar.append(np.nan)
+    return mincbar, maxcbar
 
 
 def denormalizeData(input, fields, data_type, norm_type):
@@ -305,6 +377,7 @@ def denormalizeData(input, fields, data_type, norm_type):
             exit()
 
     return output
+
 
 def verifyBoundaries(start_col, cols, tot_cols):
     donecol = False

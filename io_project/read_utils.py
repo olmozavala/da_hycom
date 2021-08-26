@@ -98,6 +98,9 @@ def normalizeData(data, field_name, data_type = PreprocParams.type_model, norm_t
     :param normalize: if True it will normalize, if false it will denormalize
     :return:
     """
+    if norm_type == PreprocParams.no_norm:
+        return data
+
     if norm_type == PreprocParams.zero_one:
         if normalize:
             if data_type == PreprocParams.type_model:
@@ -127,18 +130,21 @@ def normalizeData(data, field_name, data_type = PreprocParams.type_model, norm_t
         if data_type == PreprocParams.type_obs:
             df = pd.read_csv("stats_obs.csv")
 
-        mean_val = df[df['model'] == 'mean'][field_name].item()
-        std_val = df[df['model'] == 'std'][field_name].item()
-        if normalize:
-            output_data = (data - mean_val)/std_val
-        else:
-            output_data = (data*std_val) + mean_val
+        try:
+            mean_val = df[df['model'] == 'mean'][field_name].item()
+            std_val = df[df['model'] == 'std'][field_name].item()
+            if normalize:
+                output_data = (data - mean_val)/std_val
+            else:
+                output_data = (data*std_val) + mean_val
 
-        if type(output_data) is np.ndarray:
-            return output_data
-        else:
-            # return output_data.filled(np.nan)
-            return output_data.data
+            if type(output_data) is np.ndarray:
+                return output_data
+            else:
+                # return output_data.filled(np.nan)
+                return output_data.data
+        except Exception as e:
+            return data
 
 # if norm_type == PreprocParams.mean_var:
     #     df = pd.read_csv("MIN_MAX_MEAN_STD_FINAL.csv")
@@ -274,9 +280,19 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
 
     # ******* Adding the model fields for input ********
     for c_field in field_names:
-        temp_data = input_fields_model[c_field][0, start_row:end_row, start_col:end_col]
+        # This is just to try to incorporate the difference between obs and model into the input variables
+        if c_field == "DIFFSSH":
+            modelssh = input_fields_model["srfhgt"][0, start_row:end_row, start_col:end_col]/9.806
+            obsssh = input_fields_obs["ssh"][start_row:end_row, start_col:end_col].data.astype(np.float64)
+            temp_data = modelssh - obsssh
+        else:
+            temp_data = input_fields_model[c_field][0, start_row:end_row, start_col:end_col]
+
         if c_field == "thknss":
             divide = 9806
+            temp_data = temp_data/divide
+        if c_field == "srfhgt":
+            divide = 9.806
             temp_data = temp_data/divide
         # For debugging
         # import matplotlib.pyplot as plt
@@ -314,7 +330,15 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
     # ******************* Filling the 'output' data ***************
     id_field = 0
     for c_field in output_fields:
-        temp_data = output_field_increment[c_field][0, start_row:end_row, start_col:end_col]
+        back_data = input_fields_model[c_field][0, start_row:end_row, start_col:end_col]
+        if c_field == "thknss":
+            divide = 9806
+            back_data = back_data/divide
+        if c_field == "srfhgt":
+            divide = 9.806
+            back_data = back_data/divide
+
+        temp_data = output_field_increment[c_field][0, start_row:end_row, start_col:end_col] - back_data
         # TODO this is a hack, for some reason the output field is not properly masked. So we force it to nan
         temp_data[c_mask] = np.nan
         y_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_inc,
@@ -397,6 +421,12 @@ def generateXandY3D(input_fields_model, input_fields_obs, input_fields_var, outp
     id_field = 0
     for c_field in output_fields:
         # Verify for 2D fields. If only 2D then just copy the surface data
+        if c_field == "thknss":
+            divide = 9806
+        temp_data = temp_data/divide
+        if c_field == "srfhgt":
+            divide = 9.806
+            temp_data = temp_data/divide
         if input_fields_model[c_field].shape[0] > 1:
             temp_data = output_field_increment[c_field][z_layers, start_row:end_row, start_col:end_col]
             y_data[:, :, :, id_field] = np.rollaxis(temp_data, 0, 3)

@@ -27,6 +27,7 @@ class PreprocParams(Enum):
     layers_to_plot = 11  # Which Z-axis layers to plot
     zero_one = 13
     mean_var = 14
+    no_norm = 21
     type_model = 15
     type_obs = 16
     type_inc = 17
@@ -55,6 +56,7 @@ class ProjTrainingParams(Enum):
     fields_names = 8  # Array with the names of the fields to be analyzed
     fields_names_obs = 9   # Array with the names of the fields in the observation data to be analyzed
     fields_names_var = 30   # Array with the names of the fields in the observation data to be analyzed
+    fields_names_composite = 40   # Array with the names of the fields in the observation data to be analyzed
     output_fields = 10  # String containing the name of the output field
     prediction_time = 11  # Number of days to make the prediction for
     rows = 12 # The number of rows we will tak from the whole images for training and everything

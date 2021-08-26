@@ -22,63 +22,100 @@ def changeDecimal(name):
     return name
 
 def buildSummary(name, loss, path):
-    model = [name, changeDecimal(getNetworkTypeTxt(name)), getBBOXandText(name)[2], getInputFieldsTxt(name), getOutputFieldsTxt(name), loss, path, getId(name)]
+    model = [name,
+             changeDecimal(getNetworkTypeTxt(name)),
+             getBBOXandText(name)[2],
+             getPercOcean(name)[1],
+             getInputFieldsTxt(name),
+             getOutputFieldsTxt(name),
+             loss, path, getId(name)]
     return model
 
 def buildDF(summary):
     df = {
-        "ID": [x[7] for x in summary],
+        "ID": [x[8] for x in summary],
         "Network Type": [x[1] for x in summary],
         "BBOX": [x[2] for x in summary],
-        "Input vars":[x[3] for x in summary],
-        "Output vars": [x[4] for x in summary],
-        "Loss value": [x[5] for x in summary],
+        "PercOcean": [x[3] for x in summary],
+        "Input vars":[x[4] for x in summary],
+        "Output vars": [x[5] for x in summary],
+        "Loss value": [x[6] for x in summary],
         "Name": [x[0] for x in summary],
-        "Path": [x[6] for x in summary],
+        "Path": [x[7] for x in summary],
     }
     return pd.DataFrame.from_dict(df)
 
 def fixNames(trained_models_folder):
     print("================ Fixing files names ========================")
-    from_txt = "IN_ALL"
-    to_txt = "IN_Yes-STD"
-    # First fix all the directories
-    # for root, dirs, files in os.walk(trained_models_folder):
-    #     for name in dirs:
-    #         if name.find(from_txt) != -1:
-    #             old_name = join(root, name)
-    #             new_name = join(root, name.replace(from_txt, to_txt))
-    #             print(F"From {old_name} \nTo   {new_name} \n")
-    #             os.rename(old_name, new_name)
-    #
-    # # Then all the files
-    # for root, dirs, files in os.walk(trained_models_folder):
-    #     for name in files:
-    #         if name.find(from_txt) != -1:
-    #             old_name = join(root, name)
-    #             new_name = join(root, name.replace(from_txt, to_txt))
-    #             print(F"{old_name} \n {new_name} \n")
-    #             os.rename(old_name, new_name)
+    from_txt = "_NET_NET_"
+    to_txt = "_NET_"
 
-    filter_file = "SimpleCNN"
+    # First fix all the directories
     for root, dirs, files in os.walk(trained_models_folder):
         for name in dirs:
-            if name.find(filter_file) != -1:
+            if name.find(from_txt) != -1:
                 old_name = join(root, name)
-                new_name = join(root, changeDecimal(name))
-                # print(F"From {old_name} \nTo   {new_name} \n")
-                # os.rename(old_name, new_name)
+                new_name = join(root, name.replace(from_txt, to_txt))
+                print(F"From {old_name} \nTo   {new_name} \n")
+                os.rename(old_name, new_name)
 
     # Then all the files
     for root, dirs, files in os.walk(trained_models_folder):
-        for dirname in dirs:
-            print(dirname)
         for name in files:
             if name.find(from_txt) != -1:
                 old_name = join(root, name)
-                new_name = join(root, changeDecimal(name))
+                new_name = join(root, name.replace(from_txt, to_txt))
                 print(F"{old_name} \n {new_name} \n")
-                # os.rename(old_name, new_name)
+                os.rename(old_name, new_name)
+
+    # filter_file = "GoM2D"
+    # for root, dirs, files in os.walk(trained_models_folder):
+    #     for name in dirs:
+    #         if name.find(filter_file) != -1:
+    #             old_name = join(root, name)
+    #             new_name = join(root, changeDecimal(name))
+    #             # print(F"From {old_name} \nTo   {new_name} \n")
+    #             # os.rename(old_name, new_name)
+    #
+    # # Then all the files
+    # for root, dirs, files in os.walk(trained_models_folder):
+    #     for dirname in dirs:
+    #         print(dirname)
+    #     for name in files:
+    #         if name.find(from_txt) != -1:
+    #             old_name = join(root, name)
+    #             new_name = join(root, changeDecimal(name))
+    #             print(F"{old_name} \n {new_name} \n")
+    #             # os.rename(old_name, new_name)
+
+
+def makeScatter(c_summary, group_field, xlabel, output_file):
+    """
+    Makes a scatter plot from a dataframe grouped by the specified "group_field"
+    :param c_summary:
+    :param group_field:
+    :param xlabel:
+    :param output_file:
+    :return:
+    """
+    LOSS  = "Loss value"
+    names = []
+    data = []
+    fig, ax = plt.subplots(figsize=(10,6))
+    for i, grp in enumerate(c_summary.groupby(group_field)):
+        names.append(grp[0])
+        c_data = grp[1][LOSS].values
+        data.append(c_data)
+        plt.scatter(np.ones(len(c_data))*i, c_data, label=grp[0])
+
+    plt.legend(loc="best")
+    # bp = plt.boxplot(data, labels=names, patch_artist=True, meanline=True, showmeans=True)
+    ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Validation Loss (MSE)")
+    ax.set_title(F"Validation Loss by {group_field} Type ")
+    plt.savefig(join(output_folder,output_file))
+    plt.show()
 
 if __name__ == '__main__':
 
@@ -86,6 +123,7 @@ if __name__ == '__main__':
     OUT = "Output vars"
     IN  = "Input vars"
     LOSS  = "Loss value"
+    PERCOCEAN = "PercOcean"
 
     # Read folders for all the experiments
     config = get_training()
@@ -114,7 +152,7 @@ if __name__ == '__main__':
             loss = float((model.split("-")[-1]).replace(".hdf5",""))
             if loss < min_loss:
                 min_loss = loss
-                best_model = buildSummary(model, np.around(min_loss,5), join(trained_models_folder, experiment, "models", model))
+                best_model = buildSummary(model, np.around(min_loss,5), join(trained_models_folder, experiment, "models"))
         summary.append(best_model)
     summary = buildDF(summary)
     print(summary)
@@ -122,89 +160,27 @@ if __name__ == '__main__':
     summary.to_csv(join(output_folder,"summary.csv"))
 
     # ========= Compare Network type ======
-    # data_novar = summary[summary[IN] == "No-STD"]  # All no STD data as input
-    # data_novar_srfhgt = data_novar[data_novar[OUT] == "SRFHGT"]  # Only SSH data
-    #
-    # names = []
-    # data = []
-    # fig, ax = plt.subplots(figsize=(10,6))
-    # for i, grp in enumerate(data_novar_srfhgt.groupby(NET)):
-    #     names.append(grp[0])
-    #     c_data = grp[1][LOSS].values
-    #     data.append(c_data)
-    #     plt.scatter(np.ones(len(c_data))*i, c_data, label=grp[0])
-    #
-    # plt.legend(loc="best")
-    # # bp = plt.boxplot(data, labels=names, patch_artist=True, meanline=True, showmeans=True)
-    # ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
-    # ax.set_xlabel("Network type")
-    # ax.set_ylabel("Validation Loss (MSE)")
-    # ax.set_title("Validation Loss by Network Type (SSH)")
-    # plt.savefig(join(output_folder,F"By_Network_Type_Scatter.png"))
-    # plt.show()
+    c_summary = summary[np.logical_and((summary[IN] == "sst").values, (summary[OUT] == "SRFHGT").values)]
+    c_summary = c_summary[c_summary["BBOX"] == "160x160"]  # Only 160x160
+    c_summary = c_summary[c_summary[PERCOCEAN] == "0.0"]  # Only PercOcean 0.0
+    makeScatter(c_summary, NET, "Network type", "By_Network_Type_Scatter.png")
 
-    # ========= Compare By network inputs ======
-    fig, ax = plt.subplots(figsize=(10,6))
-    for j, major_grp in enumerate(summary.groupby(OUT)):
-        out_name = major_grp[0]
-        data_out = summary[summary[OUT] == out_name]  # All srfhgt data
-        names = []
-        data = []
-        for i, grp in enumerate(data_out.groupby(IN)):
-            names.append(grp[0])
-            c_data = grp[1][LOSS].values
-            data.append(c_data)
-            # plt.scatter(np.ones(len(c_data))*i, c_data, label=grp[0])
+    # ========= Compare PercOcean ======
+    c_summary = summary[np.logical_and((summary[IN] == "sst").values, (summary[OUT] == "SRFHGT").values)]
+    c_summary = c_summary[c_summary["BBOX"] == "160x160"]  # Only 160x160
+    c_summary = c_summary[c_summary[NET] == "2DUNET"]   # Only UNet
+    makeScatter(c_summary, PERCOCEAN, "Perc Ocean", "By_PercOcean_Type_Scatter.png")
 
-        # plt.legend(loc="best")
-        bp = plt.boxplot(data, labels=names, patch_artist=True, meanline=True, showmeans=True)
-        ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
-        ax.set_xlabel("Input variables")
-        ax.set_ylabel("Validation Loss (MSE)")
-        plt.title(F"Validation Loss by output: {out_name}")
-        plt.savefig(join(output_folder,F"{out_name}_out.png"))
-        plt.show()
+    # ========= Compare BBOX ======
+    c_summary = summary[np.logical_and((summary[IN] == "sst").values, (summary[OUT] == "SRFHGT").values)]
+    c_summary = c_summary[c_summary[NET] == "2DUNET"]   # Only UNet
+    c_summary = c_summary[c_summary[PERCOCEAN] == "0.0"]  # Only PercOcean 0.0
+    makeScatter(c_summary, "BBOX", "BBOX size", "By_bbox_Type_Scatter.png")
 
-    # # ========= Compare by Output field ======
-    # data_novar_unet = data_novar[data_novar[NET] == "UNET"]  # All srfhgt data
-    #
-    # names = []
-    # data = []
-    # fig, ax = plt.subplots(figsize=(10,6))
-    # for i, grp in enumerate(data_novar_unet.groupby(OUT)):
-    #     names.append(grp[0])
-    #     c_data = grp[1][LOSS].values
-    #     data.append(c_data)
-    #     # plt.scatter(np.ones(len(c_data))*i, c_data, label=grp[0])
-    #
-    # # plt.legend(loc='best')
-    # bp = plt.boxplot(data, labels=names, patch_artist=True, meanline=True, showmeans=True)
-    # ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
-    # ax.set_xlabel("Output field")
-    # ax.set_ylabel("Validation Loss (MSE)")
-    # ax.set_title("Validation Loss by output field (UNET)")
-    # plt.savefig(join(output_folder,F"By_OutField_Type.png"))
-    # plt.show()
-    # #
-    # # # ========= Var vs no Var======
-    # names = []
-    # data = []
-    # fig, ax = plt.subplots(figsize=(10,6))
-    # for i, grp in enumerate(summary.groupby(IN)):
-    #     if grp[0].find("Yes") != -1:
-    #         names.append(F"{grp[0]} (SST, SSS, SSH)")
-    #     else:
-    #         names.append(F"{grp[0]} ")
-    #     data.append(grp[1][LOSS].values)
-    #     plt.scatter(np.ones(len(grp[1]))*i, grp[1][LOSS].values, label=grp[0])
-    #
-    # plt.legend(loc="center")
-    # # bp = plt.boxplot(data, labels=names, patch_artist=True, meanline=True, showmeans=True)
-    # ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
-    # ax.set_xlabel("Input field")
-    # ax.set_ylabel("Validation Loss (MSE)")
-    # ax.set_title("Validation Loss by input fields")
-    # plt.savefig(join(output_folder,F"By_InputField_Type_Scatter.png"))
-    # plt.show()
+    # ========= Compare OBS INPUT ======
+    c_summary = summary[summary[NET] == "2DUNET"]
+    c_summary = c_summary[c_summary[PERCOCEAN] == "0.0"]  # Only PercOcean 0.0
+    c_summary = c_summary[c_summary["BBOX"] == "160x160"]  # Only 160x160
+    makeScatter(c_summary, IN, "BBOX size", "By_bbox_Type_Scatter.png")
 
     print("Done!")

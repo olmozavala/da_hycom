@@ -38,23 +38,28 @@ def getNeworkArchitectureAndTypeFromName(networkName):
 
 def getInputFields(name):
     sections = name[name.find("IN"):].split("_")
-    model_fields = ['temp', 'srfhgt', 'salin', 'u-vel.', 'v-vel.']
-    obs_fields = ['sst', 'sss']
-    # obs_fields = ['sst', 'sss', 'ssh']
+    if "IN6" in sections[0]:
+        model_fields = ['temp', 'srfhgt', 'salin', 'u-vel.', 'v-vel.']
+    elif "IN2" in sections[0]:
+        model_fields = ['srfhgt']
+    elif "IN8" in sections[0]:
+        model_fields = ['u-vel.', 'v-vel.','temp', 'salin', 'srfhgt']
+    return model_fields
 
-    if "No-STD" in sections[1]:
-        var_fields = []
-    else:
-        var_fields = ['tem', 'sal', 'ssh', 'mdt']
-    return model_fields, obs_fields, var_fields
+def getCompostieFields(name):
+    sections = name[name.find("IN"):].split("_")
+    if "IN8" in sections[0]:
+        model_fields = ['DIFFSSH']
+    return model_fields
 
 def getInputVarFields(name):
-    sections = name[name.find("IN"):].split("_")
-    if "No-STD" in sections[1]:
-        var_fields = []
-    else:
-        var_fields = ['tem', 'sal', 'ssh', 'mdt']
-    return var_fields
+    # sections = name[name.find("IN"):].split("_")
+    # if "No-STD" in sections[1]:
+    #     var_fields = []
+    # else:
+    #     var_fields = ['tem', 'sal', 'ssh', 'mdt']
+    # return var_fields
+    return []
 
 def getInputFieldsTxt(name):
     sections = name[name.find("IN"):].split("_")
@@ -63,7 +68,18 @@ def getInputFieldsTxt(name):
         in_fields += ", SSH"
     if "LATLON" in name:
         in_fields += ", LATLON"
+    if ("IN2" in name) or ("IN8" in name):
+        in_fields += "-difssh"
     return in_fields
+
+def getObsFieldsTxt(name):
+    sections = name[name.find("IN"):].split("_")
+    all_inputs = sections[1]
+    if all_inputs.find("-") != -1:
+        all_inputs = all_inputs.replace("-err","_err")
+        return all_inputs.split("-")
+    else:
+        return [all_inputs]
 
 def getOutputFields(name):
     # ProjTrainingParams.output_fields: ['temp', 'srfhgt', 'salin', 'u-vel.', 'v-vel.']
@@ -80,7 +96,13 @@ def getId(name):
 
 def getBBOXandText(name):
     bbox = name.split("_")[-6].split("x")
-    return int(bbox[0]), int(bbox[1]), F"{bbox[0]}x{bbox[1]}"
+    return int(bbox[0]), int(bbox[1]), F"{int(bbox[0]):03d}x{int(bbox[1]):03d}"
+
+def getPercOcean(name):
+    percocean_orig = name[name.find("PERCOCEAN"):].split("_")[1]
+    perocean_number = int(percocean_orig)/10
+    perocean_str = str(perocean_number)
+    return perocean_number, perocean_str
 
 def landperc(name):
     if "no_land" in name.lower():

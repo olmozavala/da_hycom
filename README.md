@@ -13,6 +13,7 @@ This file can read preprocessed or raw data and obtain the min, max
 and variance values for each of the fields specified in `PreprocConfig.py`.
 The outputs are saved in a `stats_obs.csv` and `stats_background.csv` file. 
 Important!!! you need to add **model** in the first line of both files in order to work. 
+Important!!! This file already divides `thknss` by 9806 so we need to be shure this also happens when we read the data.
 
 ### *1_AnalizeData*
 This file is used to generate multiple plots from the raw data.
@@ -21,7 +22,6 @@ Important: this file plots together the fields defined in `PreprocConfig` parame
 PreprocParams.fields_names:     ['u-vel.', 'v-vel.','temp', 'salin', 'thknss', 'srfhgt', 'montg1', 'surflx', 'salflx', 'bl_dpth', 'mix_dpth', 'u_btrop', 'v_btrop'],
 PreprocParams.fields_names_obs: ['ssh', 'ssh_err', 'sst', 'sst_err', 'sss', 'sss_err', 'uc', 'vc'],
 ````
-
 
 ### *2_PreprocData*
 This file was used (not anymore) to preprocess the hycom and

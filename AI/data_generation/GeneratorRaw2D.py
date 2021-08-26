@@ -11,7 +11,8 @@ from img_viz.eoa_viz import EOAImageVisualizer
 from constants.AI_params import AiModels, ModelParams
 from datetime import datetime
 
-def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names, output_fields, z_layers=[0], examples_per_figure):
+def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names, output_fields, z_layers=[0],
+                      examples_per_figure=10, perc_ocean=0, composite_field_names=[]):
     """
     This generator should generate X and Y for a CNN
     :param path:
@@ -97,15 +98,16 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
 
                 try:
                     input_data, y_data = generateXandY2D(input_fields_model, input_fields_obs, [], output_field_increment,
-                                                       field_names, obs_field_names, [], output_fields,
-                                                       start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
+                                                       field_names+composite_field_names, obs_field_names, [], output_fields,
+                                                        start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
+                    # start_row, start_col, rows, cols, norm_type=PreprocParams.no_norm, perc_ocean=perc_ocean)
                 except Exception as e:
-                    # print(F"Failed for {model_file_name}: {e}")
+                    print(F"Failed for {model_file_name}: {e}")
                     continue
 
                 succ_attempts += 1
 
-                # We set a value of 0.5 on the land. Trying a new loss function that do not takes into account land
+                # Making all land pixels to 0
                 input_data = np.nan_to_num(input_data, nan=0)
                 y_data = np.nan_to_num(y_data, nan=0)
 
@@ -119,7 +121,7 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
                 # # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
                 # viz_obj = EOAImageVisualizer(output_folder=join(output_folder, "training_imgs"), disp_images=False)
                 # viz_obj.plot_2d_data_np(np.rollaxis(X[0,:,:,:],2,0),
-                #                             var_names=[F"in_model_{x}" for x in field_names] +
+                #                             var_names=[F"in_model_{x}" for x in field_names+composite_field_names] +
                 #                                       [F"in_obs_{x}" for x in obs_field_names],
                 #                             flip_data=True,
                 #                             file_name_prefix=F"{c_id}_{start_col}_{start_row}",

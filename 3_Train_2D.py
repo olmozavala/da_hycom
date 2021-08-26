@@ -1,4 +1,5 @@
 from datetime import datetime
+from pandas import DataFrame
 from config.MainConfig_2D import get_training
 from config.PreprocConfig import get_preproc_config
 from AI.data_generation.GeneratorRaw2D import data_gen_from_raw
@@ -28,6 +29,7 @@ def doTraining(config):
     fields = config[ProjTrainingParams.fields_names]
     fields_obs = config[ProjTrainingParams.fields_names_obs]
     output_fields = config[ProjTrainingParams.output_fields]
+    fields_comp = config[ProjTrainingParams.fields_names_composite]
 
     output_folder = config[TrainingParams.output_folder]
     val_perc = config[TrainingParams.validation_percentage]
@@ -44,10 +46,12 @@ def doTraining(config):
     parameters_folder = join(output_folder, 'Parameters')
     weights_folder = join(output_folder, 'models')
     logs_folder = join(output_folder, 'logs')
+    input_info_folder = join(output_folder, 'Inputs')
     create_folder(split_info_folder)
     create_folder(parameters_folder)
     create_folder(weights_folder)
     create_folder(logs_folder)
+    create_folder(input_info_folder)
 
     # Compute how many cases
     all_increment_files = os.listdir(input_folder_increment)
@@ -59,7 +63,7 @@ def doTraining(config):
     [train_ids, val_ids, test_ids] = utilsNN.split_train_validation_and_test(tot_examples,
                                                                              val_percentage=val_perc,
                                                                              test_percentage=test_perc,
-                                                                             shuffle_ids=True)
+                                                                             shuffle_ids=False)
 
     print(F"Train examples (total:{len(train_ids)}) :{files_to_read[train_ids]}")
     print(F"Validation examples (total:{len(val_ids)}) :{files_to_read[val_ids]}:")
@@ -70,13 +74,29 @@ def doTraining(config):
     model_name = F'{run_name}_{now}'
 
     # ******************* Selecting the model **********************
-    model = select_2d_model(config, last_activation=None)
+    net_type = config[ProjTrainingParams.network_type]
+    if net_type == NetworkTypes.UNET or net_type == NetworkTypes.UNET_MultiStream:
+        model = select_2d_model(config, last_activation=None)
+    if net_type == NetworkTypes.SimpleCNN_2:
+        model = simpleCNN(config, nn_type="2d", hid_lay=2, out_lay=2)
+    if net_type == NetworkTypes.SimpleCNN_4:
+        model = simpleCNN(config, nn_type="2d", hid_lay=4, out_lay=2)
+    if net_type == NetworkTypes.SimpleCNN_8:
+        model = simpleCNN(config, nn_type="2d", hid_lay=8, out_lay=2)
+    if net_type == NetworkTypes.SimpleCNN_16:
+        model = simpleCNN(config, nn_type="2d", hid_lay=16, out_lay=2)
 
     plot_model(model, to_file=join(output_folder,F'{model_name}.png'), show_shapes=True)
 
     print("Saving split information...")
     file_name_splits = join(split_info_folder, F'{model_name}.txt')
     utilsNN.save_splits(file_name=file_name_splits, train_ids=train_ids, val_ids=val_ids, test_ids=test_ids)
+
+    print("Saving input parameters ...")
+    file_name_input = join(input_info_folder, F'{model_name}.txt')
+    info_splits = DataFrame({'Model': [",".join(fields)], 'Comp': [",".join(fields_comp)],
+                             'Obs':[",".join(fields_obs)], 'output':[",".join(output_fields)]})
+    info_splits.to_csv(file_name_input, index=None)
 
     print("Compiling model ...")
     model.compile(loss=loss_func, optimizer=optimizer, metrics=eval_metrics)
@@ -86,92 +106,127 @@ def doTraining(config):
     [logger, save_callback, stop_callback] = utilsNN.get_all_callbacks(model_name=model_name,
                                                                        early_stopping_func=F'val_{eval_metrics[0].__name__}',
                                                                        weights_folder=weights_folder,
-                                                                       logs_folder=logs_folder)
+                                                                       logs_folder=logs_folder,
+                                                                       patience=10)
 
     print("Training ...")
     # # ----------- Using preprocessed data -------------------
     examples_per_figure = config[TrainingParams.batch_size]
-    generator_train = data_gen_from_raw(config, preproc_config, train_ids, fields, fields_obs, output_fields, examples_per_figure=examples_per_figure)
-    generator_val = data_gen_from_raw(config, preproc_config, val_ids, fields, fields_obs, output_fields, examples_per_figure=1)
+    perc_ocean = config[ProjTrainingParams.perc_ocean]
+    generator_train = data_gen_from_raw(config, preproc_config, train_ids, fields, fields_obs, output_fields,
+                                        examples_per_figure=examples_per_figure, perc_ocean=perc_ocean, composite_field_names=fields_comp)
+    generator_val = data_gen_from_raw(config, preproc_config, val_ids, fields, fields_obs, output_fields,
+                                      examples_per_figure=1, perc_ocean=0, composite_field_names=fields_comp)
 
     model.fit_generator(generator_train, steps_per_epoch=min(1000, len(train_ids)),
                         validation_data=generator_val,
-                        validation_steps=min(100, len(val_ids)),
-                        # validation_steps=100,
+                        # validation_steps=min(100, len(val_ids)),
+                        validation_steps=100,
                         use_multiprocessing=False,
                         workers=1,
                         # validation_freq=10, # How often to compute the validation loss
                         epochs=epochs, callbacks=[logger, save_callback, stop_callback])
 
-def multipleRuns(config, start_i, N, bboxes, network_types, network_names, perc_ocean):
-    orig_name = config[TrainingParams.config_name]
-    depth = len(config[ProjTrainingParams.fields_names]) + len(config[ProjTrainingParams.fields_names_obs]) + len(config[ProjTrainingParams.fields_names_var])
-    config[ModelParams.INPUT_SIZE][2] = depth
+def multipleRuns(config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, obs_in_fields):
 
-    print(" --------------- Testing different bbox selections -------------------")
-    local_name = orig_name.replace("OUTPUT", "OUT_SRFHGT")
     for i in range(N):
         for j, net_type_id in enumerate(network_types):
             for c_bbox in bboxes:
                 for c_perc_ocean in perc_ocean:
-                    local_name = local_name.replace("RUN", F"{(i+start_i):04d}")
-                    # Set network to use
-                    local_name = local_name.replace("NETWORK", network_names[j])
-                    config[ProjTrainingParams.network_type] = net_type_id
-                    # Set bbox to use
-                    local_name = local_name.replace("ROWS", str(c_bbox[0]))
-                    local_name = local_name.replace("COLS", str(c_bbox[1]))
-                    input_size = config[ModelParams.INPUT_SIZE]
-                    input_size[0] = c_bbox[0]
-                    input_size[1] = c_bbox[1]
-                    config[ModelParams.INPUT_SIZE] = input_size
-                    # Set perc ocean
-                    local_name = local_name.replace("PERCOCEAN", F"PERCOCEAN_{c_perc_ocean}")
-                    config[ProjTrainingParams.perc_ocean] = c_perc_ocean
-                    # Changing the number of images generated per example to improve speed
-                    if c_bbox[0] == 80 or c_bbox[0] == 160:
-                        config[TrainingParams.batch_size] = 10
-                    else:
-                        config[TrainingParams.batch_size] = 1
+                    for c_obs_in in obs_in_fields:
+                        local_name = orig_name.replace("OUTPUT", "OUT_SRFHGT")
+                        local_name = local_name.replace("RUN", F"{(i+start_i):04d}")
+                        # Set network to use
+                        local_name = local_name.replace("NETWORK", F"NET_{network_names[j]}")
+                        config[ProjTrainingParams.network_type] = net_type_id
+                        # Set obsinputfields
+                        local_name = local_name.replace("OBSIN", F"{'-'.join([x.replace('_','-') for x in c_obs_in])}")
+                        config[ProjTrainingParams.fields_names_obs] = c_obs_in
+                        # Set bbox to use
+                        local_name = local_name.replace("ROWS", str(c_bbox[0]))
+                        local_name = local_name.replace("COLS", str(c_bbox[1]))
+                        input_size = config[ModelParams.INPUT_SIZE]
+                        input_size[0] = c_bbox[0]
+                        input_size[1] = c_bbox[1]
+                        input_size[2] = len(config[ProjTrainingParams.fields_names]) + len(c_obs_in) + \
+                                        len(config[ProjTrainingParams.fields_names_var]) + len(config[ProjTrainingParams.fields_names_composite])
+                        config[ModelParams.INPUT_SIZE] = input_size
+                        # Set perc ocean
+                        local_name = local_name.replace("PERCOCEAN", F"PERCOCEAN_{str(c_perc_ocean).replace('.','')}")
+                        config[ProjTrainingParams.perc_ocean] = c_perc_ocean
 
-                    print(F"Final local_name: {local_name}")
-                    config[TrainingParams.config_name] = local_name
-                    doTraining(config)
+                        # Changing the number of images generated per example to improve speed
+                        if c_bbox[0] == 80 or c_bbox[0] == 160:
+                            config[TrainingParams.batch_size] = 10
+                        else:
+                            config[TrainingParams.batch_size] = 1
+
+                        print(F"----------------------{local_name}----------------------")
+                        config[TrainingParams.config_name] = local_name
+                        doTraining(config)
 
 if __name__ == '__main__':
     orig_config = get_training()
     # Single training
     # doTraining(orig_config)
 
-    bboxes = [[160, 160]]
-    perc_ocean = [.95]
-    network_types = [NetworkTypes.UNET]
-    network_names = ["NET_2DUNET"]
-    multipleRuns(orig_config, 0, 1, bboxes, network_types, network_names, perc_ocean)
+    # bboxes = [[160, 160]]
+    # perc_ocean = [.95]
+    # network_types = [NetworkTypes.UNET]
+    # network_names = ["NET_2DUNET"]
+    # multipleRuns(orig_config, 0, 1, bboxes, network_types, network_names, perc_ocean)
 
     # # ====================================================================
     # # ====================== Multiple trainings ==========================
     # # ====================================================================
-    # start_i = 0 # When to start (if we already have some runs)
-    # N = 5  # How many networks we want to run for each experiment
+    orig_name = orig_config[TrainingParams.config_name]
+
+    start_i = 0 # When to start (if we already have some runs)
+    N = 3  # How many networks we want to run for each experiment
+
+    # # ========== JUST TESTS =================
+    print(" --------------- Testing different input OBS types -------------------")
+    bboxes = [[384,520]]
+    perc_ocean = [0]
+    network_types = [NetworkTypes.UNET]
+    network_names = ["2DUNET"]
+    obs_in_fields = [["ssh", "ssh_err", "sst", "sst_err"]]
+    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, obs_in_fields)
+
+    # # ========== Testing obs input fields =================
+    # print(" --------------- Testing different input OBS types -------------------")
+    # bboxes = [[160,160]]
+    # perc_ocean = [0]
+    # network_types = [NetworkTypes.UNET]
+    # network_names = ["2DUNET"]
+    # obs_in_fields = [["sst", "ssh", "sst_err", "ssh_err"], ["sst","ssh"]]
+    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, obs_in_fields)
     #
     # # ========== Testing BBOX options =================
-    # bboxes = [[80,80], [160,160], [384,520]]
+    # print(" --------------- Testing different bbox selections -------------------")
+    # bboxes = [[80,80], [120, 120], [160,160], [384,520]]
     # perc_ocean = [0]
     # network_types = [NetworkTypes.UNET]
-    # network_names = ["NET_2DUNET"]
-    # multipleRuns(orig_config, start_i, N, bboxes, network_types, network_names, perc_ocean)
+    # obs_in_fields = [["sst"]]
+    # network_names = ["2DUNET"]
+    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, obs_in_fields)
     #
     # # ========== Testing Types of NN options =================
+    # print(" --------------- Testing different NN selections -------------------")
     # bboxes = [[160,160]]
     # perc_ocean = [0]
-    # network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
-    # network_names = ["NET_2DUNET", "SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
-    # multipleRuns(orig_config, start_i, N, bboxes, network_types, network_names, perc_ocean)
-    #
-    # # ========== Testing perc of oceans =================
+    # # network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
+    # # network_names = ["NET_2DUNET", "SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
+    # network_types = [NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
+    # network_names = ["SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
+    # obs_in_fields = [["sst"]]
+    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, obs_in_fields)
+
+    # ========== Testing perc of oceans =================
+    # print(" --------------- Testing different Perc ocean -------------------")
     # bboxes = [[160,160]]
-    # perc_ocean = [0, .5, .9]
+    # perc_ocean = [.3, .6, .9]
     # network_types = [NetworkTypes.UNET]
-    # network_names = ["NET_2DUNET"]
-    # multipleRuns(orig_config, start_i, N, bboxes, network_types, network_names, perc_ocean)
+    # network_names = ["2DUNET"]
+    # obs_in_fields = [["sst"]]
+    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, obs_in_fields)
