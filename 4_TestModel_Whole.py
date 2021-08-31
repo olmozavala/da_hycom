@@ -1,4 +1,5 @@
 import os
+from scipy.ndimage import convolve, zoom, median_filter, maximum_filter, gaussian_filter, minimum_filter, percentile_filter, spline_filter
 from io_project.read_utils import generateXandY2D, normalizeData
 
 from tensorflow.keras.utils import plot_model
@@ -17,7 +18,7 @@ from models.modelSelector import select_2d_model
 from models_proj.models import *
 from constants.AI_params import TrainingParams, ModelParams
 from img_viz.common import create_folder
-from datetime import datetime
+from datetime import datetime, timedelta
 from inout.io_hycom import read_hycom_fields
 
 from sklearn.metrics import mean_squared_error
@@ -165,16 +166,18 @@ def test_model(config):
 
     start_test_idx = 583+73
 
-    for id_file, c_file in enumerate(increment_files[start_test_idx:]):
+    # for id_file, c_file in enumerate(increment_files[start_test_idx:]):
+    for id_file, c_file in enumerate(increment_files):
         # Find current and next date
         sp_name = c_file.split("/")[-1].split(".")[1]
         c_datetime = datetime.strptime(sp_name, "%Y_%j_18")
+        c_datetime_next_day = c_datetime + timedelta(days=1)
         day_of_year = c_datetime.timetuple().tm_yday
         print(F"=================== Day of year {day_of_year} ==========================")
 
         model_file_name = join(input_folder_background, F"020_archv.{c_datetime.strftime('%Y_%j')}_18.a")
         increment_file_name = c_file
-        obs_file_name = join(input_folder_observations, F"tsis_obs_gomb4_{c_datetime.strftime('%Y%m%d')}00.nc")
+        obs_file_name = join(input_folder_observations, F"tsis_obs_gomb4_{c_datetime_next_day.strftime('%Y%m%d')}00.nc")
 
         # *********************** Reading files **************************
         input_fields_model = read_hycom_fields(model_file_name, field_names, z_layers)
@@ -256,10 +259,36 @@ def test_model(config):
         if True: # Plot 10% of the times
             # viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
             viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
-                                         mincbar=cminmax_model[0]+cminmax_comp[0]+cminmax_obs[0]+cminmax_std[0]+cminmax_out[0]+cminmax_out[0]+cminmax_error[0],
-                                         maxcbar=cminmax_model[1]+cminmax_comp[1]+cminmax_obs[1]+cminmax_std[1]+cminmax_out[1]+cminmax_out[1]+cminmax_error[1])
+                                         mincbar=cminmax_model[0]+cminmax_out[0]+cminmax_obs[0]+cminmax_std[0]+cminmax_out[0]+cminmax_out[0]+cminmax_error[0],
+                                         maxcbar=cminmax_model[1]+cminmax_out[1]+cminmax_obs[1]+cminmax_std[1]+cminmax_out[1]+cminmax_out[1]+cminmax_error[1])
+            size = 2
+            filter = 1/(2**2) * np.ones((size,size))
+            # Smooths DIFF
+            temp_field = denorm_input[:,:,len(field_names)] # Reads the "DIFF" field
+            temp_field = np.nan_to_num(temp_field, 0)
+            # temp_field = convolve(temp_field, filter)  # Here is the convolution (extension of values)
+            # temp_field = median_filter(temp_field, size)  # Here is the convolution (extension of values)
+            # temp_field = maximum_filter(temp_field, size)  # Here is the convolution (extension of values)
+            temp_field_max = maximum_filter(temp_field, size)  # Here is the convolution (extension of values)
+            temp_field_min = minimum_filter(temp_field, size)  # Here is the convolution (extension of values)
+            temp_field = temp_field_min + temp_field_max
+            # temp_field = percentile_filter(temp_field, 20, size)
+            temp_field = gaussian_filter(temp_field, 1)
+            # temp_field[temp_field == 0] = np.nan
+            eps = .001
+            temp_field[np.logical_and(temp_field >= -eps, temp_field <= eps)] = np.nan
+            temp2 = denorm_y[:, :, 0].copy()
+            temp_idxs = np.logical_not(np.isnan(temp_field))
+            temp2[temp_idxs] = temp_field[temp_idxs]
+            denorm_input[:,:,len(field_names)] = temp2 # Reassigned
 
-            # viz_obj.plot_2d_data_np_raw(np.concatenate((input_data.swapaxes(0,2), Y[0,:,:,:].swapaxes(0,2), output_nn_original[0,:,:,:].swapaxes(0,2))),
+            # Smooths Observations
+            temp_field = denorm_input[:,:,len(field_names) + 1] # Reads the "DIFF" field
+            temp_field = np.nan_to_num(temp_field, 0)
+            temp_field = convolve(temp_field, filter)  # Here is the convolution (extension of values)
+            temp_field[temp_field == 0] = np.nan
+            denorm_input[:,:,len(field_names) + 1] = temp_field  # Reassigned
+
             viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_input.swapaxes(0,2), denorm_y.swapaxes(0,2), denorm_cnn.swapaxes(0,2), error.swapaxes(0,2))),
                                         var_names=[F"in_model_{x}" for x in field_names] +
                                                   [F"in_comp_{x}" for x in comp_field_names] +
@@ -273,7 +302,7 @@ def test_model(config):
                                         cmap=cmap_model+cmap_comp+cmap_obs+cmap_std+cmap_out+cmap_out+cmap_error,
                                         cmap_labels=cmap_label_model+cmap_label_comp+cmap_label_obs+cmap_label_std+cmap_label_out+cmap_label_out+cmap_label_error,
                                         # cols_per_row=len(field_names),
-                                        cols_per_row=4,
+                                        cols_per_row=5,
                                         # title=F"Input data: {field_names} and obs {obs_field_names}, increment {output_fields}, cnn {output_fields}")
                                         title=F"RMSE {rmse_cnn:0.4f} m {sp_name}")
 

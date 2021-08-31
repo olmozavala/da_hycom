@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from pandas import DataFrame
 from config.MainConfig_2D import get_training
 from config.PreprocConfig import get_preproc_config
@@ -181,8 +181,8 @@ if __name__ == '__main__':
     # # ====================================================================
     orig_name = orig_config[TrainingParams.config_name]
 
-    start_i = 0 # When to start (if we already have some runs)
-    N = 3  # How many networks we want to run for each experiment
+    start_i = 3 # When to start (if we already have some runs)
+    N = 5  # How many networks we want to run for each experiment
 
     # # ========== JUST TESTS =================
     print(" --------------- Testing different input OBS types -------------------")

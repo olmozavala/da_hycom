@@ -9,7 +9,7 @@ from constants_proj.AI_proj_params import ProjTrainingParams, PreprocParams
 from constants.AI_params import TrainingParams
 from img_viz.eoa_viz import EOAImageVisualizer
 from constants.AI_params import AiModels, ModelParams
-from datetime import datetime
+from datetime import datetime,timedelta
 
 def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names, output_fields, z_layers=[0],
                       examples_per_figure=10, perc_ocean=0, composite_field_names=[]):
@@ -43,9 +43,10 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
     for f_idx, c_file in enumerate(increment_files):
         sp_name = c_file.split("/")[-1].split(".")[1]
         c_datetime = datetime.strptime(sp_name, "%Y_%j_18")
+        c_datetime_next_day = c_datetime + timedelta(days=1)
 
         background_files.append(join(input_folder_background, F"020_archv.{c_datetime.strftime('%Y_%j')}_18.a"))
-        obs_files.append(join(input_folder_observations, F"tsis_obs_gomb4_{c_datetime.strftime('%Y%m%d')}00.nc"))
+        obs_files.append(join(input_folder_observations, F"tsis_obs_gomb4_{c_datetime_next_day.strftime('%Y%m%d')}00.nc"))
         assert os.path.exists(background_files[f_idx])
         assert os.path.exists(obs_files[f_idx])
 

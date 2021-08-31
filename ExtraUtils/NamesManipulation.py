@@ -44,13 +44,15 @@ def getInputFields(name):
         model_fields = ['srfhgt']
     elif "IN8" in sections[0]:
         model_fields = ['u-vel.', 'v-vel.','temp', 'salin', 'srfhgt']
+    elif "IN7" in sections[0]:
+        model_fields = ['temp', 'srfhgt']
     return model_fields
 
 def getCompostieFields(name):
     sections = name[name.find("IN"):].split("_")
-    if "IN8" in sections[0]:
-        model_fields = ['DIFFSSH']
-    return model_fields
+    if ("IN8" in sections[0]) or ("IN7" in sections[0]):
+        comp_fields = ['DIFFSSH']
+    return comp_fields
 
 def getInputVarFields(name):
     # sections = name[name.find("IN"):].split("_")

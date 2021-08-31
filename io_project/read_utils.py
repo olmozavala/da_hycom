@@ -284,7 +284,7 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
         if c_field == "DIFFSSH":
             modelssh = input_fields_model["srfhgt"][0, start_row:end_row, start_col:end_col]/9.806
             obsssh = input_fields_obs["ssh"][start_row:end_row, start_col:end_col].data.astype(np.float64)
-            temp_data = modelssh - obsssh
+            temp_data = obsssh - modelssh
         else:
             temp_data = input_fields_model[c_field][0, start_row:end_row, start_col:end_col]
 
@@ -338,6 +338,7 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
             divide = 9.806
             back_data = back_data/divide
 
+        # Here we compute the increment as TSIS - Model
         temp_data = output_field_increment[c_field][0, start_row:end_row, start_col:end_col] - back_data
         # TODO this is a hack, for some reason the output field is not properly masked. So we force it to nan
         temp_data[c_mask] = np.nan

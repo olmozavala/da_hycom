@@ -14,7 +14,7 @@ from constants_proj.AI_proj_params import PreprocParams, ParallelParams
 from config.PreprocConfig import get_preproc_config
 from preproc.UtilsDates import get_day_of_year_from_month_and_day
 from sklearn.metrics import mean_squared_error
-from scipy.ndimage import convolve
+from scipy.ndimage import convolve, gaussian_filter
 import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 import xarray as xr
@@ -84,7 +84,13 @@ def plot_raw_data_new(proc_id):
                     # Old format
                     # re_hycom = F'archv.{c_year}_{c_day_of_year:03d}\S*.a'
                     # re_obs = F'tsis_obs_ias_{c_year}{c_month:02d}{c_day_of_month+1:02d}\S*.nc'
-                    re_obs = F'tsis_obs_gomb4_{c_year}{c_month:02d}{c_day_of_month+1:02d}\S*.nc'
+                    try: # Super patch to get the file for the next day
+                        re_obs = F'tsis_obs_gomb4_{c_year}{c_month:02d}{c_day_of_month+2:02d}\S*.nc'
+                    except Exception as e:
+                        if c_month < 12:
+                            re_obs = F'tsis_obs_gomb4_{c_year}{c_month+1:02d}{1:02d}\S*.nc'
+                        else:
+                            re_obs = F'tsis_obs_gomb4_{c_year+1}{1:02d}{1:02d}\S*.nc'
 
                     try:
                         # Gets the proper index of the file for the three cases
@@ -146,7 +152,7 @@ def plot_raw_data_new(proc_id):
                             mincbar = -0.20
                             maxcbar = 0.20
 
-                        inc = (model_state_np_c_field - increment_np_c_field)
+                        inc = (increment_np_c_field - model_state_np_c_field)
 
                         # ======================= Only Background state and TSIS increment ==================
                         # try:
@@ -165,16 +171,22 @@ def plot_raw_data_new(proc_id):
                         title = F"{(c_day_of_month+1):02d}"
                         obs_np_c_field = obs_np_fields[c_obs_field_name]
 
+                        # Computes the difference between the BACK - OBS
                         diff = obs_np_c_field - model_state_np_c_field[0,:,:]
 
                         if c_obs_field_name == "ssh":
-                            size = 2
+                            size = 3
                             filter = 1/(2**2) * np.ones((size,size))
+                            # Smooths obs
                             obs_np_c_field = np.nan_to_num(obs_np_c_field, 0)
-                            obs_np_c_field= convolve(obs_np_c_field, filter)
-                            diff = convolve(obs_np_c_field, filter)
+                            # obs_np_c_field= convolve(obs_np_c_field, filter)
+                            obs_np_c_field = gaussian_filter(obs_np_c_field, 1)
                             obs_np_c_field[obs_np_c_field== 0] = np.nan
-                            diff[diff== 0] = np.nan
+                            # Smooths difference
+                            diff= np.nan_to_num(diff, 0)
+                            diff = gaussian_filter(diff , 1)
+                            eps = .001
+                            diff[np.logical_and(diff >= -eps, diff <= eps)] = np.nan
 
                         # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, inc],
                         # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, np.expand_dims(diff,0), inc],
@@ -194,8 +206,8 @@ def plot_raw_data_new(proc_id):
                                                 var_names=[F'Obs', 'HYCOM', 'OBS-HYCOM', 'INC', "INC + DIFF"],
                                                 title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
                                                 cmap=cmocean.cm.curl,
-                                                maxcbar=[np.nan, np.nan, np.nan, maxcbar, maxcbar],
-                                                mincbar=[np.nan, np.nan, np.nan, mincbar, mincbar],
+                                                maxcbar=[maxcbar, np.nan, maxcbar, maxcbar, maxcbar],
+                                                mincbar=[mincbar, np.nan, mincbar, mincbar, mincbar],
                                                 flip_data=True, plot_mode=plot_modes[idx_field])
                         # img_viz.plot_3d_data_np([inc, t],
                         #                         var_names=['INC', "INC + DIFF"],

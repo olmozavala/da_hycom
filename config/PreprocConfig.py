@@ -34,8 +34,8 @@ def get_preproc_config():
         # PreprocParams.fields_names:     ['u-vel.', 'v-vel.','temp', 'salin', 'thknss', 'srfhgt', 'montg1', 'surflx', 'salflx', 'bl_dpth', 'mix_dpth', 'u_btrop', 'v_btrop'],
         # PreprocParams.fields_names_obs: ['ssh', 'ssh_err', 'sst', 'sst_err', 'sss_err', 'uc', 'vc'],
 
-        PreprocParams.fields_names:     ['srfhgt', 'temp'],
-        PreprocParams.fields_names_obs: ['ssh', 'sst'],
+        PreprocParams.fields_names:     ['srfhgt'],
+        PreprocParams.fields_names_obs: ['ssh'],
 
         # PreprocParams.plot_modes_per_field: [PlotMode.RASTER, PlotMode.MERGED, PlotMode.RASTER, PlotMode.RASTER, PlotMode.RASTER],
         PreprocParams.plot_modes_per_field: [PlotMode.RASTER for x in range(14)],
