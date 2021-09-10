@@ -51,7 +51,7 @@ def getInputFields(name):
 def getCompostieFields(name):
     sections = name[name.find("IN"):].split("_")
     if ("IN8" in sections[0]) or ("IN7" in sections[0]):
-        comp_fields = ['DIFFSSH']
+        comp_fields = ['diff_ssh']
     return comp_fields
 
 def getInputVarFields(name):

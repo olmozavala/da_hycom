@@ -45,7 +45,7 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
         c_datetime = datetime.strptime(sp_name, "%Y_%j_18")
         c_datetime_next_day = c_datetime + timedelta(days=1)
 
-        background_files.append(join(input_folder_background, F"020_archv.{c_datetime.strftime('%Y_%j')}_18.a"))
+        background_files.append(join(input_folder_background, F"022_archv.{c_datetime.strftime('%Y_%j')}_18.a"))
         obs_files.append(join(input_folder_observations, F"tsis_obs_gomb4_{c_datetime_next_day.strftime('%Y%m%d')}00.nc"))
         assert os.path.exists(background_files[f_idx])
         assert os.path.exists(obs_files[f_idx])
@@ -116,15 +116,25 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
                 Y = np.expand_dims(y_data, axis=0)
                 # --------------- Just for debugging Plotting input and output---------------------------
                 # import matplotlib.pyplot as plt
+                # from scipy.ndimage import convolve, gaussian_filter
+                # import cmocean
                 # # mincbar = np.nanmin(input_data)
                 # # maxcbar = np.nanmax(input_data)
                 # output_folder = config[TrainingParams.output_folder]
+                # # Replace nan to 0
+                # X[0,:,:,2] = np.nan_to_num(X[0,:,:,2], 0 )
+                # X[0,:,:,3] = np.nan_to_num(X[0,:,:,3], 0 )
+                # # Apply gaussian filter
+                # X[0,:,:,2] = gaussian_filter(X[0,:,:,2], 2)
+                # X[0,:,:,3] = gaussian_filter(X[0,:,:,3], 2)
+                #
                 # # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
                 # viz_obj = EOAImageVisualizer(output_folder=join(output_folder, "training_imgs"), disp_images=False)
                 # viz_obj.plot_2d_data_np(np.rollaxis(X[0,:,:,:],2,0),
                 #                             var_names=[F"in_model_{x}" for x in field_names+composite_field_names] +
                 #                                       [F"in_obs_{x}" for x in obs_field_names],
                 #                             flip_data=True,
+                #                             cmap=cmocean.cm.curl,
                 #                             file_name_prefix=F"{c_id}_{start_col}_{start_row}",
                 #                             title=F"")
                 #

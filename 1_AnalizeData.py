@@ -1,6 +1,6 @@
 from info.info_hycom import read_field_names
 import cmocean
-from inout.io_hycom import read_hycom_fields
+from inout.io_hycom import read_hycom_fields, sub_var2
 from inout.io_netcdf import read_netcdf, read_netcdf_xr
 from img_viz.eoa_viz import EOAImageVisualizer
 from img_viz.constants import PlotMode
@@ -24,19 +24,6 @@ import cartopy.feature as cfeature
 import cartopy
 
 NUM_PROC = 1
-
-def main():
-    # ----------- Parallel -------
-    # p = Pool(NUM_PROC)
-    # compute_consecutive_days_difference()
-    # p.map(plot_raw_data_new, range(NUM_PROC))
-    # p.map(img_generation_hycom, range(NUM_PROC))
-    # img_generation_all(1)  # Single proc generation
-    plot_raw_data_new(0)
-
-    # ----------- Sequencial -------
-    # img_generation_all(1)
-    # testing()
 
 def plot_raw_data_new(proc_id):
     """
@@ -64,7 +51,7 @@ def plot_raw_data_new(proc_id):
         # Iterate current month
         for c_month in MONTHS:
             try:
-                days_of_month, days_of_year = get_days_from_month(c_month)
+                days_of_month, day_of_year_this_month = get_days_from_month(c_month)
                 # Reads the data (DA, Free run, and observations)
                 increment_files, increment_paths = get_hycom_file_name(input_folder_tsis, c_year, c_month)
                 hycom_files, hycom_paths = get_hycom_file_name(input_folder_forecast, c_year, c_month, day_idx=2)
@@ -76,11 +63,11 @@ def plot_raw_data_new(proc_id):
                 continue
 
             # This for is fixed to be able to run in parallel
-            for c_day_of_month, c_day_of_year in enumerate(days_of_year):
+            for c_day_of_month, c_day_of_year in enumerate(day_of_year_this_month[0:3]):
                 if (c_day_of_month % NUM_PROC) == proc_id:
                     # Makes regular expression of the current desired file
                     re_tsis = F'incupd.{c_year}_{c_day_of_year:03d}\S*.a'
-                    re_hycom = F'020_archv.{c_year}_{c_day_of_year:03d}\S*.a'
+                    re_hycom = F'\S*_archv.{c_year}_{c_day_of_year:03d}\S*.a'
                     # Old format
                     # re_hycom = F'archv.{c_year}_{c_day_of_year:03d}\S*.a'
                     # re_obs = F'tsis_obs_ias_{c_year}{c_month:02d}{c_day_of_month+1:02d}\S*.nc'
@@ -110,6 +97,14 @@ def plot_raw_data_new(proc_id):
                     model_state_np_fields = read_hycom_fields(hycom_paths[hycom_file_idx], fields, layers=layers)
                     increment_np_fields = read_hycom_fields(increment_paths[increment_file_idx], fields, layers=layers)
 
+                    first_field = model_state_np_fields[fields[0]]
+                    idm4 = first_field.shape[2]
+                    jdm4 = first_field.shape[1]
+
+                    grid_file = "/data/HYCOM/DA_HYCOM_TSIS/Topography/regional.grid.a"
+                    dx4= sub_var2(grid_file,idm4,jdm4,10)  #  dx in meters
+                    dy4= sub_var2(grid_file,idm4,jdm4,11)
+
                     # obs_np_fields = read_netcdf(obs_paths[obs_file_idx], fields_obs, rename_fields=fields)
                     obs_np_fields = read_netcdf_xr(obs_paths[obs_file_idx], fields_obs)
 
@@ -132,6 +127,9 @@ def plot_raw_data_new(proc_id):
 
                         maxcbar = np.nan
                         mincbar = np.nan
+
+
+                        # Correcting fields (changing units)
                         if c_field_name == "thknss":
                             divide = 9806
                             model_state_np_c_field = model_state_np_c_field/divide
@@ -152,6 +150,7 @@ def plot_raw_data_new(proc_id):
                             mincbar = -0.20
                             maxcbar = 0.20
 
+                        # Computing the increment
                         inc = (increment_np_c_field - model_state_np_c_field)
 
                         # ======================= Only Background state and TSIS increment ==================
@@ -171,6 +170,20 @@ def plot_raw_data_new(proc_id):
                         title = F"{(c_day_of_month+1):02d}"
                         obs_np_c_field = obs_np_fields[c_obs_field_name]
 
+                        # Put the observations in the same range than the background (remove bias)
+                        if c_field_name == "srfhgt":
+                            # ---------- Manual version --------------
+                            # mask4=np.zeros([jdm4,idm4]l
+                            # mask4[np.logical_not(np.isnan(model_state_np_c_field[0,:,:]))] = 1.
+                            # ssh_mean=np.nansum(model_state_np_c_field[0,:,:]*dx4*dy4)/np.nansum(dx4*dy4*mask4)
+                            # model_state_np_c_field =(model_state_np_c_field-ssh_mean)/9.806
+                            # ---------- Remove bias tisis version --------------
+                            # data_loc = np.logical_and(np.logical_not(np.isnan(model_state_np_c_field[0,:,:])),
+                            #                           np.logical_not(np.isnan(obs_np_c_field)))
+                            ssh_bias = np.mean(model_state_np_c_field[0,:,:] - obs_np_c_field)
+                            obs_np_c_field += ssh_bias
+
+                        # model_state_np_c_field =model_state_np_c_field/9.806
                         # Computes the difference between the BACK - OBS
                         diff = obs_np_c_field - model_state_np_c_field[0,:,:]
 
@@ -185,7 +198,7 @@ def plot_raw_data_new(proc_id):
                             # Smooths difference
                             diff= np.nan_to_num(diff, 0)
                             diff = gaussian_filter(diff , 1)
-                            eps = .001
+                            eps = .005
                             diff[np.logical_and(diff >= -eps, diff <= eps)] = np.nan
 
                         # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, inc],
@@ -195,7 +208,7 @@ def plot_raw_data_new(proc_id):
                         #                         flip_data=True, plot_mode=plot_modes[idx_field])
 
 
-                        # ========================= THIS IS JUST FOR TESTING =============
+                        # Just for testing. Adds the difference into the increment
                         if c_obs_field_name == "ssh":
                             t = np.expand_dims(diff,0).copy()
                             t[np.isnan(t)] = inc[np.isnan(t)]
@@ -242,7 +255,7 @@ def plot_raw_data(proc_id):
         # Iterate current month
         for c_month in MONTHS:
             try:
-                days_of_month, days_of_year = get_days_from_month(c_month)
+                days_of_month, day_of_year_this_month = get_days_from_month(c_month)
                 # Reads the data (DA, Free run, and observations)
                 increment_files, increment_paths = get_hycom_file_name(input_folder_tsis, c_year, c_month)
                 hycom_files, hycom_paths = get_hycom_file_name(input_folder_forecast, c_year, c_month)
@@ -252,7 +265,7 @@ def plot_raw_data(proc_id):
                 continue
 
             # This for is fixed to be able to run in parallel
-            for c_day_of_month, c_day_of_year in enumerate(days_of_year):
+            for c_day_of_month, c_day_of_year in enumerate(day_of_year_this_month):
                 if (c_day_of_month % NUM_PROC) == proc_id:
                     # Makes regular expression of the current desired file
                     re_tsis = F'incupd.{c_year}_{c_day_of_year:03d}\S*.a'
@@ -337,7 +350,7 @@ def compute_consecutive_days_difference():
         for c_month in MONTHS:
             # Reading the data
             try:
-                days_of_month, days_of_year = get_days_from_month(c_month)
+                days_of_month, day_of_year_this_month = get_days_from_month(c_month)
                 # Reading hycom files
                 hycom_files, hycom_paths = get_hycom_file_name(input_folder_forecast, c_year, c_month)
             except Exception as e:
@@ -345,7 +358,7 @@ def compute_consecutive_days_difference():
                 continue
 
             # This for is fixed to be able to run in parallel
-            for c_day_of_month, c_day_of_year in enumerate(days_of_year):
+            for c_day_of_month, c_day_of_year in enumerate(day_of_year_this_month):
                 print(F"---------- Year {c_year} day: {c_day_of_year} --------------")
                 # Makes regular expression of the current desired file
                 re_hycom = F'archv.{c_year}_{c_day_of_year:03d}\S*.a'
@@ -403,7 +416,7 @@ def img_generation_hycom(proc_id):
         # Iterate current month
         for c_month in MONTHS:
             try:
-                days_of_month, days_of_year = get_days_from_month(c_month)
+                days_of_month, day_of_year_this_month = get_days_from_month(c_month)
                 # Reads the data (DA, Free run, and observations)
                 hycom_files, hycom_paths = get_hycom_file_name(input_folder_forecast, c_year, c_month)
             except Exception as e:
@@ -411,7 +424,7 @@ def img_generation_hycom(proc_id):
                 continue
 
             # This for is fixed to be able to run in parallel
-            for c_day_of_month, c_day_of_year in enumerate(days_of_year):
+            for c_day_of_month, c_day_of_year in enumerate(day_of_year_this_month[0:3]):
                 if (c_day_of_month % NUM_PROC) == proc_id:
                     # Makes regular expression of the current desired file
                     re_hycom = F'archv.{c_year}_{c_day_of_year:03d}\S*.a'
@@ -586,7 +599,17 @@ def plotPunctualDataFromObs(ds, title):
     #     plt.show()
 
 if __name__ == '__main__':
-    main()
+    # ----------- Parallel -------
+    # p = Pool(NUM_PROC)
+    # compute_consecutive_days_difference()
+    # p.map(plot_raw_data_new, range(NUM_PROC))
+    # p.map(img_generation_hycom, range(NUM_PROC))
+    # img_generation_all(1)  # Single proc generation
+    plot_raw_data_new(0)
+
+    # ----------- Sequencial -------
+    # img_generation_all(1)
+    # testing()
     # visualizeBackgroundIncrementAnalaysis()
     # print("Done!")
     #

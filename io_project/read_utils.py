@@ -7,6 +7,7 @@ from constants_proj.AI_proj_params import MAX_MODEL, MAX_OBS, MIN_OBS, MIN_MODEL
 from os.path import join, isfile
 import os
 import numpy as np
+import xarray as xr
 
 def get_preproc_increment_files(input_folder):
     all_files = os.listdir(input_folder)
@@ -278,13 +279,26 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
     end_col = start_col + cols
     id_field = 0 # Id of the input fields
 
-    # ******* Adding the model fields for input ********
+    # ******* Ad![](../../../../../../../../../../data/HYCOM/DA_HYCOM_TSIS/Training/training_imgs/293_5_0_out.png)ding the model fields for input ********
+    ssh_bias = 0
     for c_field in field_names:
         # This is just to try to incorporate the difference between obs and model into the input variables
-        if c_field == "DIFFSSH":
+        if c_field == "diff_ssh":
             modelssh = input_fields_model["srfhgt"][0, start_row:end_row, start_col:end_col]/9.806
             obsssh = input_fields_obs["ssh"][start_row:end_row, start_col:end_col].data.astype(np.float64)
-            temp_data = obsssh - modelssh
+            ssh_bias = np.nanmean(modelssh - obsssh)
+            temp_data = obsssh - modelssh + ssh_bias
+        elif c_field == "diff_sst":
+            modelsst = input_fields_model["temp"][0, start_row:end_row, start_col:end_col]
+            obssst = input_fields_obs["sst"][start_row:end_row, start_col:end_col].data.astype(np.float64)
+            sst_bias = np.nanmean(modelsst - obssst)
+            temp_data = obssst - modelsst + sst_bias
+        elif c_field == "topo":
+            file_topo = "/data/HYCOM/DA_HYCOM_TSIS/Topography/gridinfo.nc"
+            topo_ds = xr.open_dataset(file_topo)
+            depth_topo = topo_ds['mdepth']
+            depth_mask = depth_topo > 100  # Depth we want to consider
+            temp_data = depth_mask[start_row:end_row, start_col:end_col]
         else:
             temp_data = input_fields_model[c_field][0, start_row:end_row, start_col:end_col]
 
@@ -314,6 +328,8 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
     # ******* Adding the observations fields for input ********
     for c_field in obs_field_names:
         temp_data = input_fields_obs[c_field][start_row:end_row, start_col:end_col].data.astype(np.float64)
+        if c_field == "ssh":
+            temp_data += ssh_bias
         input_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_obs,
                                                    norm_type=norm_type, normalize=True)
         # input_data[:, :, id_field] = temp_data

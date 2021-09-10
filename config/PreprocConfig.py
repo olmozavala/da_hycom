@@ -9,12 +9,14 @@ _output_folder = '/data/HYCOM/DA_HYCOM_TSIS/'  # Where to save everything
 def get_preproc_config():
     model_config = {
         # PreprocParams.input_folder_hycom: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies',
-        PreprocParams.input_folder_hycom: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.0/data',
+        # PreprocParams.input_folder_hycom: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.0/data',
+        PreprocParams.input_folder_hycom: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/data',
         # PreprocParams.input_folder_hycom: '/data/HYCOM/DA_HYCOM_TSIS/RAW_2021/HYCOM',
 
         # PreprocParams.input_folder_tsis: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies/incup/',
         # PreprocParams.input_folder_tsis: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.0/incup',
-        PreprocParams.input_folder_tsis: '/data/HYCOM/DA_HYCOM_TSIS/RAW_2021/TSIS',
+        PreprocParams.input_folder_tsis: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/incup',
+        # PreprocParams.input_folder_tsis: '/data/HYCOM/DA_HYCOM_TSIS/RAW_2021/TSIS',
 
         # PreprocParams.input_folder_obs: '/data/COAPS_nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES',
         PreprocParams.input_folder_obs: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/obs/qcobs_roif',
@@ -23,8 +25,8 @@ def get_preproc_config():
         PreprocParams.output_folder: join(_output_folder, 'preproctest'),
         PreprocParams.imgs_output_folder: join(_output_folder, 'preproc', 'imgs'),
         PreprocParams.YEARS: [2009],
-        # PreprocParams.MONTHS: range(1, 13),
-        PreprocParams.MONTHS: [1],
+        PreprocParams.MONTHS: range(1, 13),
+        # PreprocParams.MONTHS: range(10,13),
 
         # Available fields on increment: ['montg1', 'srfhgt', 'surflx', 'salflx', 'bl_dpth', 'mix_dpth', 'u_btrop', 'v_btrop', 'u-vel.', 'v-vel.', 'thknss', 'temp', 'salin']
         # Available fields on model:     ['montg1', 'srfhgt', 'surflx', 'salflx', 'bl_dpth', 'mix_dpth', 'u_btrop', 'v_btrop', 'u-vel.', 'v-vel.', 'thknss', 'temp', 'salin', 'oneta', 'wtrflx']
@@ -34,8 +36,11 @@ def get_preproc_config():
         # PreprocParams.fields_names:     ['u-vel.', 'v-vel.','temp', 'salin', 'thknss', 'srfhgt', 'montg1', 'surflx', 'salflx', 'bl_dpth', 'mix_dpth', 'u_btrop', 'v_btrop'],
         # PreprocParams.fields_names_obs: ['ssh', 'ssh_err', 'sst', 'sst_err', 'sss_err', 'uc', 'vc'],
 
-        PreprocParams.fields_names:     ['srfhgt'],
-        PreprocParams.fields_names_obs: ['ssh'],
+        # PreprocParams.fields_names:     ['srfhgt', 'temp', 'u-vel.'],
+        # PreprocParams.fields_names_obs: ['ssh', 'sst', 'uc'],
+
+        PreprocParams.fields_names:     ['temp','srfhgt'],
+        PreprocParams.fields_names_obs: ['sst','ssh'],
 
         # PreprocParams.plot_modes_per_field: [PlotMode.RASTER, PlotMode.MERGED, PlotMode.RASTER, PlotMode.RASTER, PlotMode.RASTER],
         PreprocParams.plot_modes_per_field: [PlotMode.RASTER for x in range(14)],

@@ -78,13 +78,13 @@ def doTraining(config):
     if net_type == NetworkTypes.UNET or net_type == NetworkTypes.UNET_MultiStream:
         model = select_2d_model(config, last_activation=None)
     if net_type == NetworkTypes.SimpleCNN_2:
-        model = simpleCNN(config, nn_type="2d", hid_lay=2, out_lay=2)
+        model = simpleCNN(config, nn_type="2d", hid_lay=2, out_lay=2, activation='relu', last_activation=None)
     if net_type == NetworkTypes.SimpleCNN_4:
-        model = simpleCNN(config, nn_type="2d", hid_lay=4, out_lay=2)
+        model = simpleCNN(config, nn_type="2d", hid_lay=4, out_lay=2, activation='relu', last_activation=None)
     if net_type == NetworkTypes.SimpleCNN_8:
-        model = simpleCNN(config, nn_type="2d", hid_lay=8, out_lay=2)
+        model = simpleCNN(config, nn_type="2d", hid_lay=8, out_lay=2, activation='relu', last_activation=None)
     if net_type == NetworkTypes.SimpleCNN_16:
-        model = simpleCNN(config, nn_type="2d", hid_lay=16, out_lay=2)
+        model = simpleCNN(config, nn_type="2d", hid_lay=16, out_lay=2, activation='relu', last_activation=None)
 
     plot_model(model, to_file=join(output_folder,F'{model_name}.png'), show_shapes=True)
 
@@ -95,7 +95,8 @@ def doTraining(config):
     print("Saving input parameters ...")
     file_name_input = join(input_info_folder, F'{model_name}.txt')
     info_splits = DataFrame({'Model': [",".join(fields)], 'Comp': [",".join(fields_comp)],
-                             'Obs':[",".join(fields_obs)], 'output':[",".join(output_fields)]})
+                             'Obs':[",".join(fields_obs)], 'output':[",".join(output_fields)],
+                             'Model_params':F"FilterSize:{config[ModelParams.FILTER_SIZE]}"})
     info_splits.to_csv(file_name_input, index=None)
 
     print("Compiling model ...")
@@ -151,6 +152,8 @@ def multipleRuns(config, orig_name, start_i, N, bboxes, network_types, network_n
                         input_size[2] = len(config[ProjTrainingParams.fields_names]) + len(c_obs_in) + \
                                         len(config[ProjTrainingParams.fields_names_var]) + len(config[ProjTrainingParams.fields_names_composite])
                         config[ModelParams.INPUT_SIZE] = input_size
+                        config[ProjTrainingParams.rows] = input_size[0]
+                        config[ProjTrainingParams.cols] = input_size[1]
                         # Set perc ocean
                         local_name = local_name.replace("PERCOCEAN", F"PERCOCEAN_{str(c_perc_ocean).replace('.','')}")
                         config[ProjTrainingParams.perc_ocean] = c_perc_ocean
@@ -181,17 +184,17 @@ if __name__ == '__main__':
     # # ====================================================================
     orig_name = orig_config[TrainingParams.config_name]
 
-    start_i = 3 # When to start (if we already have some runs)
+    start_i = 0 # When to start (if we already have some runs)
     N = 5  # How many networks we want to run for each experiment
 
     # # ========== JUST TESTS =================
-    print(" --------------- Testing different input OBS types -------------------")
-    bboxes = [[384,520]]
-    perc_ocean = [0]
-    network_types = [NetworkTypes.UNET]
-    network_names = ["2DUNET"]
-    obs_in_fields = [["ssh", "ssh_err", "sst", "sst_err"]]
-    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, obs_in_fields)
+    # print(" --------------- Testing different input OBS types -------------------")
+    # bboxes = [[384,520]]
+    # perc_ocean = [0]
+    # network_types = [NetworkTypes.SimpleCNN_4]
+    # network_names = ["SimpleCNN4"]
+    # obs_in_fields = [["ssh", "ssh_err", "sst", "sst_err"]]
+    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, obs_in_fields)
 
     # # ========== Testing obs input fields =================
     # print(" --------------- Testing different input OBS types -------------------")
@@ -212,15 +215,14 @@ if __name__ == '__main__':
     # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, obs_in_fields)
     #
     # # ========== Testing Types of NN options =================
-    # print(" --------------- Testing different NN selections -------------------")
+    print(" --------------- Testing different NN selections -------------------")
     # bboxes = [[160,160]]
-    # perc_ocean = [0]
-    # # network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
-    # # network_names = ["NET_2DUNET", "SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
-    # network_types = [NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
-    # network_names = ["SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
-    # obs_in_fields = [["sst"]]
-    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, obs_in_fields)
+    bboxes = [[384,520]]
+    perc_ocean = [0]
+    network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
+    network_names = ["NET_2DUNET", "SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
+    obs_in_fields = [["ssh", "ssh_err", "sst", "sst_err"]]
+    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, obs_in_fields)
 
     # ========== Testing perc of oceans =================
     # print(" --------------- Testing different Perc ocean -------------------")

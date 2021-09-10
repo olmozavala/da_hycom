@@ -77,11 +77,8 @@ def simpleCNNBK(model_params, nn_type="2d"):
         model = Model(inputs=inputs, outputs=[last_layer])
         return model
 
-def simpleCNN(model_params, nn_type="2d", hid_lay=2, out_lay=2):
-    num_filters = 32
-    filter_size = 3
-    activation = 'relu'
-    last_activation = 'relu'
+def simpleCNN(model_params, nn_type="2d", hid_lay=2, out_lay=2, activation='relu', last_activation='relu',
+                    num_filters=32, filter_size=3):
     nn_input_size = model_params[ModelParams.INPUT_SIZE]
     number_output_filters = model_params[ModelParams.OUTPUT_SIZE]
 
@@ -90,15 +87,15 @@ def simpleCNN(model_params, nn_type="2d", hid_lay=2, out_lay=2):
         for layer in range(hid_lay):
             if layer == 0:
                 cnn_layer, _ = model_builder_2d.multiple_conv_lay_2d(inputs, num_filters, filter_size, make_pool=False, batch_norm=True,
-                                                                    activation=LeakyReLU(alpha=0.2), dropout=False, tot_layers=1)
+                                                                    activation=activation, dropout=False, tot_layers=1)
             else:
                 cnn_layer, _ = model_builder_2d.multiple_conv_lay_2d(cnn_layer, num_filters*2, filter_size, make_pool=False, batch_norm=True,
-                                                                    activation=LeakyReLU(alpha=0.2), dropout=False, tot_layers=1)
+                                                                    activation=activation, dropout=False, tot_layers=1)
 
-        for dense_lay in range(out_lay-1):
-            cnn_layer = Conv2D(number_output_filters, (1, 1), activation=LeakyReLU(alpha=0.2))(cnn_layer)
+        for out_lay_idx in range(out_lay-1):
+            cnn_layer = Conv2D(number_output_filters, (1, 1), activation=activation)(cnn_layer)
 
-        last_layer = Conv2D(number_output_filters, (1, 1), activation=LeakyReLU(alpha=0.2))(cnn_layer)
+        last_layer = Conv2D(number_output_filters, (1, 1), activation=last_activation)(cnn_layer)
         model = Model(inputs=inputs, outputs=[last_layer])
         return model
 
