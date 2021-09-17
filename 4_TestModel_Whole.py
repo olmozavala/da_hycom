@@ -1,4 +1,6 @@
 import os
+
+import matplotlib.pyplot as plt
 from scipy.ndimage import convolve, zoom, median_filter, maximum_filter, gaussian_filter, minimum_filter, percentile_filter, spline_filter
 from io_project.read_utils import generateXandY2D, normalizeData
 
@@ -20,6 +22,7 @@ from constants.AI_params import TrainingParams, ModelParams
 from img_viz.common import create_folder
 from datetime import datetime, timedelta
 from inout.io_hycom import read_hycom_fields
+from os import listdir
 
 from sklearn.metrics import mean_squared_error
 
@@ -46,29 +49,31 @@ def main():
         config[ModelParams.MODEL] = network_arch
         config[ProjTrainingParams.network_type] = network_type
         # Setting input vars
-        # model_fields, obs_fields, var_fields = getInputFields(name)
-        var_fields = getInputVarFields(name)
-        model_fields = getInputFields(name)
+        inputs_path = model["Path"].replace("models", "Parameters")
+        input_file = join(inputs_path, listdir(inputs_path)[0]) # This should give you the file name with the inputs
+        in_df = pd.read_csv(input_file)
+        model_fields = in_df["Model"].item().split(',')
         config[ProjTrainingParams.fields_names] = model_fields
-        obs_fields = getObsFieldsTxt(name)
+        obs_fields = in_df["Obs"].item().split(',')
         config[ProjTrainingParams.fields_names_obs] = obs_fields
-        comp_fields = getCompostieFields(name)
+        comp_fields = in_df["Comp"].item().split(',')
         config[ProjTrainingParams.fields_names_composite] = comp_fields
-        print(F"Input fields: {model_fields}, {obs_fields}, {var_fields}, {comp_fields}")
-        # config[ProjTrainingParams.fields_names] = model_fields
-        # config[ProjTrainingParams.fields_names_obs] = obs_fields
-        config[ProjTrainingParams.fields_names_var] = var_fields
+        print(F"Input fields: {model_fields}, {obs_fields}, {comp_fields}")
+        # Model parameters
+        filter_size = int(in_df["Model_params"].item().split(':')[1])
+        config[ModelParams.FILTER_SIZE] = filter_size
+
         # Setting BBOX
         grows, gcols, bboxtxt = getBBOXandText(name)
         config[ModelParams.INPUT_SIZE][0] = grows
         config[ModelParams.INPUT_SIZE][1] = gcols
-        config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(var_fields) + len(comp_fields)
+        config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(comp_fields)
         config[ProjTrainingParams.rows] = grows
         config[ProjTrainingParams.cols] = gcols
         # Setting output vars
         # output_fields = getOutputFields(name)
         # config[ProjTrainingParams.output_fields] = output_fields
-        config[ProjTrainingParams.output_fields] = ['srfhgt']
+        config[ProjTrainingParams.output_fields] = ['srfhgt', 'temp']
         # Setting model weights file
         config[PredictionParams.model_weights_file] = join(model["Path"],model["Name"])
         print(F"Model's weight file: {config[PredictionParams.model_weights_file]}")
@@ -133,13 +138,12 @@ def test_model(config):
         input_fields_std = []
 
     # Selects the min max color values
-    cminmax_out = getMinMaxCbar(output_fields)
-    # cminmax_model = getMinMaxCbar(field_names)
-    cminmax_model = getMinMaxCbar(["" for x in field_names])
+    cminmax_out = getMinMaxCbar([F"{x}_out" for x in output_fields])
+    cminmax_model = getMinMaxCbar(field_names)
     cminmax_obs = getMinMaxCbar(obs_field_names)
     cminmax_comp = getMinMaxCbar(comp_field_names)
     cminmax_std = getMinMaxCbar(field_names_std)
-    cminmax_error = getMinMaxCbar(["error"])
+    cminmax_error = getMinMaxCbar([F"error_{x}" for x in output_fields])
 
     # Selects the colormap to use for each field
     cmap_out = chooseCMAP(output_fields)
@@ -147,7 +151,7 @@ def test_model(config):
     cmap_comp = chooseCMAP(comp_field_names)
     cmap_obs = chooseCMAP(obs_field_names)
     cmap_std = chooseCMAP(field_names_std)
-    cmap_error = chooseCMAP(["error"])
+    cmap_error = chooseCMAP([F"error_{x}" for x in output_fields])
 
     # Selects the colormap label to use for each field
     cmap_label_out = getFieldUnits(output_fields)
@@ -155,7 +159,7 @@ def test_model(config):
     cmap_label_comp = getFieldUnits(comp_field_names)
     cmap_label_obs = getFieldUnits(obs_field_names)
     cmap_label_std = getFieldUnits(field_names_std)
-    cmap_label_error = getFieldUnits(["error"])
+    cmap_label_error = getFieldUnits([F"error_{x}" for x in output_fields])
 
     all_whole_mean_times = []
     all_whole_sum_times = []
@@ -166,8 +170,8 @@ def test_model(config):
 
     start_test_idx = 583+73
 
-    # for id_file, c_file in enumerate(increment_files[start_test_idx:]):
-    for id_file, c_file in enumerate(increment_files):
+    for id_file, c_file in enumerate(increment_files[start_test_idx:]):
+    # for id_file, c_file in enumerate(increment_files):
         # Find current and next date
         sp_name = c_file.split("/")[-1].split(".")[1]
         c_datetime = datetime.strptime(sp_name, "%Y_%j_18")
@@ -175,7 +179,7 @@ def test_model(config):
         day_of_year = c_datetime.timetuple().tm_yday
         print(F"=================== Day of year {day_of_year} ==========================")
 
-        model_file_name = join(input_folder_background, F"020_archv.{c_datetime.strftime('%Y_%j')}_18.a")
+        model_file_name = join(input_folder_background, F"022_archv.{c_datetime.strftime('%Y_%j')}_18.a")
         increment_file_name = c_file
         obs_file_name = join(input_folder_observations, F"tsis_obs_gomb4_{c_datetime_next_day.strftime('%Y%m%d')}00.nc")
 
@@ -242,91 +246,94 @@ def test_model(config):
         land_indexes = y_data == -0.5
         denorm_y[land_indexes] = np.nan
 
-        # Adding back mask to all the input variables
+
+    # Adding back mask to all the input variables
         denorm_input[input_data_nans] = np.nan
 
         error = denorm_y - denorm_cnn
         no_zero_ids = np.count_nonzero(np.logical_not(np.isnan(cnn_output)))
 
-        rmse_cnn = np.sqrt( np.nansum( (denorm_y - denorm_cnn)**2 )/no_zero_ids)
-        mae_cnn = np.nansum( np.abs(denorm_y - denorm_cnn))/no_zero_ids
+        rmse_cnn = np.sqrt( np.nansum( (denorm_y - denorm_cnn)**2 , axis=(0,1))/no_zero_ids)
+        mae_cnn = np.nansum( np.abs(denorm_y - denorm_cnn), axis=(0,1))/no_zero_ids
 
         all_whole_rmse.append(rmse_cnn)
         all_whole_mean_times.append(np.mean(np.array(this_file_times)))
         all_whole_sum_times.append(np.sum(np.array(this_file_times)))
 
-        # if day_of_year%30 == 0: # Plot 10% of the times
+        # if day_of_year%318 == 0: # Plot 10% of the times
         if True: # Plot 10% of the times
-            # viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
+            all_cmin = cminmax_model[0]+cminmax_comp[0]+cminmax_obs[0]+cminmax_std[0]+cminmax_out[0]+cminmax_out[0]+cminmax_error[0]
+            all_cmax = cminmax_model[1]+cminmax_comp[1]+cminmax_obs[1]+cminmax_std[1]+cminmax_out[1]+cminmax_out[1]+cminmax_error[1]
             viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
-                                         mincbar=cminmax_model[0]+cminmax_out[0]+cminmax_obs[0]+cminmax_std[0]+cminmax_out[0]+cminmax_out[0]+cminmax_error[0],
-                                         maxcbar=cminmax_model[1]+cminmax_out[1]+cminmax_obs[1]+cminmax_std[1]+cminmax_out[1]+cminmax_out[1]+cminmax_error[1])
+                                         mincbar=all_cmin,
+                                         maxcbar=all_cmax)
             size = 2
             filter = 1/(2**2) * np.ones((size,size))
-            # Smooths DIFF
-            temp_field = denorm_input[:,:,len(field_names)] # Reads the "DIFF" field
+
+            eps = .001
+            # ------------------ Smoothing fields for visualizaiton -------------
+            obs_ssh_idx = len(field_names) + len(comp_field_names)
+            ssh_diff_idx = len(field_names)
+            model_ssh_idx = 1 # TODO review this is the SSH index for th emodel
+
+            # Smooths SSH (Assumes the first obs field is always SSH)
+            temp_field = denorm_input[:,:,obs_ssh_idx]  # Selects SSH
             temp_field = np.nan_to_num(temp_field, 0)
-            # temp_field = convolve(temp_field, filter)  # Here is the convolution (extension of values)
-            # temp_field = median_filter(temp_field, size)  # Here is the convolution (extension of values)
-            # temp_field = maximum_filter(temp_field, size)  # Here is the convolution (extension of values)
-            temp_field_max = maximum_filter(temp_field, size)  # Here is the convolution (extension of values)
-            temp_field_min = minimum_filter(temp_field, size)  # Here is the convolution (extension of values)
-            temp_field = temp_field_min + temp_field_max
-            # temp_field = percentile_filter(temp_field, 20, size)
+            temp_field = gaussian_filter(temp_field, 1)
+            temp_field[np.logical_and(temp_field >= -eps, temp_field <= eps)] = np.nan
+            denorm_input[:,:,obs_ssh_idx] = temp_field
+
+            # # Smooths DIFF_SSH (assumes it is the first composite field)
+            temp_field = denorm_input[:,:,ssh_diff_idx] # Reads the "DIFF" field
+            temp_field = np.nan_to_num(temp_field, 0)
             temp_field = gaussian_filter(temp_field, 1)
             # temp_field[temp_field == 0] = np.nan
-            eps = .001
             temp_field[np.logical_and(temp_field >= -eps, temp_field <= eps)] = np.nan
-            temp2 = denorm_y[:, :, 0].copy()
+            temp2 = denorm_y[:, :, model_ssh_idx].copy()
             temp_idxs = np.logical_not(np.isnan(temp_field))
             temp2[temp_idxs] = temp_field[temp_idxs]
-            denorm_input[:,:,len(field_names)] = temp2 # Reassigned
+            # denorm_input[:,:,ssh_diff_idx] = temp2 # Reassigned the input diff
+            denorm_input[:,:,ssh_diff_idx] = temp_field# Only smoothed diff
+            #
+            # # Smooths Observations
+            # temp_field = denorm_input[:,:,len(field_names) + 1] # Reads the "DIFF" field
+            # temp_field = np.nan_to_num(temp_field, 0)
+            # temp_field = convolve(temp_field, filter)  # Here is the convolution (extension of values)
+            # temp_field[temp_field == 0] = np.nan
+            # denorm_input[:,:,len(field_names) + 1] = temp_field  # Reassigned
 
-            # Smooths Observations
-            temp_field = denorm_input[:,:,len(field_names) + 1] # Reads the "DIFF" field
-            temp_field = np.nan_to_num(temp_field, 0)
-            temp_field = convolve(temp_field, filter)  # Here is the convolution (extension of values)
-            temp_field[temp_field == 0] = np.nan
-            denorm_input[:,:,len(field_names) + 1] = temp_field  # Reassigned
+            rmse_txts =[F"{rmse_cnn[i]:0.4f}" for i,x in enumerate(output_fields)]
 
+            # # ================== Displays ALL ================
             viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_input.swapaxes(0,2), denorm_y.swapaxes(0,2), denorm_cnn.swapaxes(0,2), error.swapaxes(0,2))),
                                         var_names=[F"in_model_{x}" for x in field_names] +
                                                   [F"in_comp_{x}" for x in comp_field_names] +
                                                   [F"in_obs_{x}" for x in obs_field_names] +
-                                                  [F"in_var_{x}" for x in field_names_std] +
-                                                  [F"out_inc_{x} MAE ({np.nanmean(np.abs(denorm_y[:,:,i])):0.2f})" for i,x in enumerate(output_fields)] +
+                                                  [F"out_inc_{x} (MAE {np.nanmean(np.abs(denorm_y[:,:,i])):0.2f})" for i,x in enumerate(output_fields)] +
                                                   [F"cnn_{x}" for x in output_fields] +
-                                                  [F"Difference RMSE {rmse_cnn:0.4f} MAE {mae_cnn:0.4f}"],
+                                                  [F"Difference RMSE {rmse_cnn[i]:0.4f} MAE {mae_cnn[i]:0.4f}" for i, x in enumerate(output_fields)],
                                         file_name=F"Global_Input_and_CNN_{sp_name}",
                                         rot_90=True,
                                         cmap=cmap_model+cmap_comp+cmap_obs+cmap_std+cmap_out+cmap_out+cmap_error,
-                                        cmap_labels=cmap_label_model+cmap_label_comp+cmap_label_obs+cmap_label_std+cmap_label_out+cmap_label_out+cmap_label_error,
+                                        cmap_labels=cmap_label_model+cmap_label_comp+cmap_label_obs+cmap_label_out+cmap_label_out+cmap_label_error,
                                         # cols_per_row=len(field_names),
-                                        cols_per_row=5,
+                                        cols_per_row=4,
                                         # title=F"Input data: {field_names} and obs {obs_field_names}, increment {output_fields}, cnn {output_fields}")
-                                        title=F"RMSE {rmse_cnn:0.4f} m {sp_name}")
+                                        title=F"RMSE {rmse_txts} m {sp_name}")
 
-            # # ================== Displays CNN and TSIS with RMSE ================
-            # minmax = getMinMaxPlot(output_fields)[0]
-            # viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
-            #                              # mincbar=mincbar + mincbar + mincbarerror,
-            #                              # maxcbar=maxcbar + maxcbar + maxcbarerror)
-            #                              # mincbar=[minmax[0], minmax[0], max(minmax[0],-1)],
-            #                              # maxcbar=[minmax[1], minmax[1], min(minmax[1],1)])
-            #                             mincbar=[minmax[0], minmax[0], -1],
-            #                             maxcbar=[minmax[1], minmax[1], 1])
-            #
-            # error_cmap = cmocean.cm.diff
-            # viz_obj.output_folder = join(output_imgs_folder,'WholeOutput_CNN_TSIS')
-            # viz_obj.plot_2d_data_np_raw([np.flip(cnn_output, axis=0), np.flip(y_data, axis=0), np.flip(error, axis=0)],
-            #                             # var_names=[F"CNN INC {x}" for x in output_fields] + [F"TSIS INC {x}" for x in output_fields] + [F'TSIS - CNN (Mean RMSE {rmse_cnn:0.4f} m)'],
-            #                             var_names=[F"CNN increment SSH" for x in output_fields] + [F"TSIS increment SSH" for x in output_fields] + [F'TSIS - CNN \n (Mean RMSE {rmse_cnn:0.4f} m)'],
-            #                             file_name=F"Global_WholeOutput_CNN_TSIS_{c_file}",
-            #                             rot_90=False,
-            #                             cmap=cmap_out+cmap_out+[error_cmap],
-            #                             cols_per_row=3,
-            #                             # title=F"{output_fields[0]} RMSE: {np.mean(rmse_cnn):0.5f} m.")
-            #                             title=F"SSH RMSE: {np.mean(rmse_cnn):0.5f} m.")
+            # # ================== Displays only CNN and TSIS with RMSE ================
+            viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
+                                         mincbar=cminmax_out[0]+cminmax_out[0]+cminmax_error[0],
+                                         maxcbar=cminmax_out[1]+cminmax_out[1]+cminmax_error[1])
+
+            viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_y.swapaxes(0,2), denorm_cnn.swapaxes(0,2), error.swapaxes(0,2))),
+                                        var_names=[F"TSIS {x}" for x in output_fields] + [F"CNN {x}" for x in output_fields] + [F'TSIS - CNN \n (Mean RMSE {rmse_cnn[i]:0.4f} m)' for i in range(len(output_fields))],
+                                        file_name=F"Global_WholeOutput_CNN_TSIS_{sp_name}",
+                                        rot_90=True,
+                                        cmap=cmap_out+cmap_out+cmap_error,
+                                        cmap_labels=cmap_label_out+cmap_label_out+cmap_label_error,
+                                        cols_per_row=2,
+                                        title=F"RMSE {rmse_txts} m {sp_name}")
 
             print("DONE ALL FILES!!!!!!!!!!!!!")
     dic_summary = {
@@ -364,11 +371,20 @@ def getMinMaxCbar(fields):
     maxcbar = []
     for c_field in fields:
         if c_field == "srfhgt" or c_field == "ssh":
-            maxcbar.append(.2)
-            mincbar.append(-.2)
-        elif c_field == "temp" or c_field == "sst" or c_field == "temp":
+            maxcbar.append(.4)
+            mincbar.append(-.4)
+        elif c_field == "temp" or c_field == "sst":
             maxcbar.append(np.nan)
             mincbar.append(np.nan)
+        elif c_field == "srfhgt_out":
+            maxcbar.append(.4)
+            mincbar.append(-.4)
+        elif c_field == "temp_out" :
+            maxcbar.append(1.)
+            mincbar.append(-1.)
+        elif c_field == "diff_ssh":
+            maxcbar.append(0.4)
+            mincbar.append(-0.4)
         elif c_field == "salin" or c_field == "sss" or c_field == "sal":
             maxcbar.append(np.nan)
             mincbar.append(np.nan)
@@ -378,9 +394,12 @@ def getMinMaxCbar(fields):
         elif c_field == "v-vel.":
             maxcbar.append(np.nan)
             mincbar.append(np.nan)
-        elif c_field == "error":
-            maxcbar.append(np.nan)
-            mincbar.append(np.nan)
+        elif c_field == "error_srfhgt":
+            maxcbar.append(0.4)
+            mincbar.append(-0.4)
+        elif c_field == "error_temp":
+            maxcbar.append(0.5)
+            mincbar.append(-0.5)
         else:
             maxcbar.append(np.nan)
             mincbar.append(np.nan)

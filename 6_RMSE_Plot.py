@@ -62,9 +62,9 @@ for c_model in all_folders:
             # Only used if you want to plot where the trainging and validation cuts are
             # plt.axvline(x=year_day[train_id], c='g')
             # plt.axvline(x=year_day[val_id], c='r')
-            plt.ylim([0.01,0.07])
+            plt.ylim([0.001,0.03])
             plt.ylabel('Meters')
-            plt.xlabel('Day of the year')
+            plt.xlabel(F'Day of the year {}')
             # plt.title(F"RMSE of SSH prediction by dataset: \n training: {rms_mean.iloc[:train_id].mean():0.3f}  validation:{rms_mean.iloc[train_id:val_id].mean():0.3f} test:{rms_mean.iloc[val_id:].mean():0.3f} ")
             plt.title(F"{model_title}\nRMSE of SSH prediction of test dataset: {rms_mean.mean():0.4f} ")
             print(join(imgs_prediction_folder, F"{c_model}_RMSE.png"))

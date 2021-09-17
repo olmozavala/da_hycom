@@ -63,7 +63,9 @@ def plot_raw_data_new(proc_id):
                 continue
 
             # This for is fixed to be able to run in parallel
-            for c_day_of_month, c_day_of_year in enumerate(day_of_year_this_month[0:3]):
+            for c_day_of_month, c_day_of_year in enumerate(day_of_year_this_month):
+                if c_day_of_year <= 317:
+                    continue
                 if (c_day_of_month % NUM_PROC) == proc_id:
                     # Makes regular expression of the current desired file
                     re_tsis = F'incupd.{c_year}_{c_day_of_year:03d}\S*.a'
@@ -102,8 +104,8 @@ def plot_raw_data_new(proc_id):
                     jdm4 = first_field.shape[1]
 
                     grid_file = "/data/HYCOM/DA_HYCOM_TSIS/Topography/regional.grid.a"
-                    dx4= sub_var2(grid_file,idm4,jdm4,10)  #  dx in meters
-                    dy4= sub_var2(grid_file,idm4,jdm4,11)
+                    dx4 = sub_var2(grid_file,idm4,jdm4,10)  #  dx in meters
+                    dy4 = sub_var2(grid_file,idm4,jdm4,11)
 
                     # obs_np_fields = read_netcdf(obs_paths[obs_file_idx], fields_obs, rename_fields=fields)
                     obs_np_fields = read_netcdf_xr(obs_paths[obs_file_idx], fields_obs)
@@ -127,7 +129,6 @@ def plot_raw_data_new(proc_id):
 
                         maxcbar = np.nan
                         mincbar = np.nan
-
 
                         # Correcting fields (changing units)
                         if c_field_name == "thknss":
@@ -219,8 +220,8 @@ def plot_raw_data_new(proc_id):
                                                 var_names=[F'Obs', 'HYCOM', 'OBS-HYCOM', 'INC', "INC + DIFF"],
                                                 title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
                                                 cmap=cmocean.cm.curl,
-                                                maxcbar=[maxcbar, np.nan, maxcbar, maxcbar, maxcbar],
-                                                mincbar=[mincbar, np.nan, mincbar, mincbar, mincbar],
+                                                maxcbar=[maxcbar, maxcbar, maxcbar, maxcbar, maxcbar],
+                                                mincbar=[mincbar, mincbar, mincbar, mincbar, mincbar],
                                                 flip_data=True, plot_mode=plot_modes[idx_field])
                         # img_viz.plot_3d_data_np([inc, t],
                         #                         var_names=['INC', "INC + DIFF"],

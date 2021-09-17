@@ -159,28 +159,34 @@ if __name__ == '__main__':
 
     summary.to_csv(join(output_folder,"summary.csv"))
 
+    def_bbox = "384x520"
+    def_in = "ssh-ssh-err-sst-sst-err"
+    def_out = "SRFHGTSST"
+    # def_out = "SRFHGT"
+    def_perc_ocean = "0.0"
     # ========= Compare Network type ======
-    c_summary = summary[np.logical_and((summary[IN] == "sst").values, (summary[OUT] == "SRFHGT").values)]
-    c_summary = c_summary[c_summary["BBOX"] == "160x160"]  # Only 160x160
-    c_summary = c_summary[c_summary[PERCOCEAN] == "0.0"]  # Only PercOcean 0.0
+    c_summary = summary[np.logical_and((summary[IN] == def_in).values, (summary[OUT] == def_out).values)]
+    c_summary = c_summary[c_summary["BBOX"] == def_bbox]
+    c_summary = c_summary[c_summary[PERCOCEAN] == def_perc_ocean]  # Only PercOcean 0.0
     makeScatter(c_summary, NET, "Network type", "By_Network_Type_Scatter.png")
 
     # ========= Compare PercOcean ======
-    c_summary = summary[np.logical_and((summary[IN] == "sst").values, (summary[OUT] == "SRFHGT").values)]
-    c_summary = c_summary[c_summary["BBOX"] == "160x160"]  # Only 160x160
+    c_summary = summary[np.logical_and((summary[IN] == def_in).values, (summary[OUT] == def_out).values)]
+    c_summary = c_summary[c_summary["BBOX"] == def_bbox]  # Only 160x160
     c_summary = c_summary[c_summary[NET] == "2DUNET"]   # Only UNet
     makeScatter(c_summary, PERCOCEAN, "Perc Ocean", "By_PercOcean_Type_Scatter.png")
 
     # ========= Compare BBOX ======
-    c_summary = summary[np.logical_and((summary[IN] == "sst").values, (summary[OUT] == "SRFHGT").values)]
+    c_summary = summary[np.logical_and((summary[IN] == def_in).values, (summary[OUT] == def_out).values)]
     c_summary = c_summary[c_summary[NET] == "2DUNET"]   # Only UNet
-    c_summary = c_summary[c_summary[PERCOCEAN] == "0.0"]  # Only PercOcean 0.0
+    c_summary = c_summary[c_summary[PERCOCEAN] == def_perc_ocean]  # Only PercOcean 0.0
     makeScatter(c_summary, "BBOX", "BBOX size", "By_bbox_Type_Scatter.png")
 
     # ========= Compare OBS INPUT ======
-    c_summary = summary[summary[NET] == "2DUNET"]
-    c_summary = c_summary[c_summary[PERCOCEAN] == "0.0"]  # Only PercOcean 0.0
-    c_summary = c_summary[c_summary["BBOX"] == "160x160"]  # Only 160x160
-    makeScatter(c_summary, IN, "BBOX size", "By_bbox_Type_Scatter.png")
+    c_summary = summary[summary[OUT] == def_out]
+    c_summary = c_summary[c_summary[NET] == "2DUNET"]
+    c_summary = c_summary[c_summary[PERCOCEAN] == def_perc_ocean]  # Only PercOcean 0.0
+    c_summary = c_summary[c_summary["BBOX"] == def_bbox]  # Only 160x160
+    makeScatter(c_summary, IN, "BBOX size", "By_Inputs_Scatter.png")
 
     print("Done!")

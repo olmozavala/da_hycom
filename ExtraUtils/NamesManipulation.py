@@ -36,33 +36,6 @@ def getNeworkArchitectureAndTypeFromName(networkName):
     else:
         return AiModels.UNET_2D_SINGLE, NetworkTypes.UNET
 
-def getInputFields(name):
-    sections = name[name.find("IN"):].split("_")
-    if "IN6" in sections[0]:
-        model_fields = ['temp', 'srfhgt', 'salin', 'u-vel.', 'v-vel.']
-    elif "IN2" in sections[0]:
-        model_fields = ['srfhgt']
-    elif "IN8" in sections[0]:
-        model_fields = ['u-vel.', 'v-vel.','temp', 'salin', 'srfhgt']
-    elif "IN7" in sections[0]:
-        model_fields = ['temp', 'srfhgt']
-    return model_fields
-
-def getCompostieFields(name):
-    sections = name[name.find("IN"):].split("_")
-    if ("IN8" in sections[0]) or ("IN7" in sections[0]):
-        comp_fields = ['diff_ssh']
-    return comp_fields
-
-def getInputVarFields(name):
-    # sections = name[name.find("IN"):].split("_")
-    # if "No-STD" in sections[1]:
-    #     var_fields = []
-    # else:
-    #     var_fields = ['tem', 'sal', 'ssh', 'mdt']
-    # return var_fields
-    return []
-
 def getInputFieldsTxt(name):
     sections = name[name.find("IN"):].split("_")
     in_fields = sections[1]
