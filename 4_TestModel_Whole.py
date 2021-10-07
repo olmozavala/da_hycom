@@ -52,13 +52,20 @@ def main():
         inputs_path = model["Path"].replace("models", "Parameters")
         input_file = join(inputs_path, listdir(inputs_path)[0]) # This should give you the file name with the inputs
         in_df = pd.read_csv(input_file)
+        # Setting model vars
         model_fields = in_df["Model"].item().split(',')
         config[ProjTrainingParams.fields_names] = model_fields
+        # Setting obs vars
         obs_fields = in_df["Obs"].item().split(',')
         config[ProjTrainingParams.fields_names_obs] = obs_fields
+        # Setting composite vars
         comp_fields = in_df["Comp"].item().split(',')
         config[ProjTrainingParams.fields_names_composite] = comp_fields
-        print(F"Input fields: {model_fields}, {obs_fields}, {comp_fields}")
+        # Setting output vars
+        output_fields = in_df["output"].item().split(',')
+        config[ProjTrainingParams.output_fields] = output_fields
+        config[ModelParams.OUTPUT_SIZE] = len(config[ProjTrainingParams.output_fields])
+        print(F"Input fields: {model_fields}, {obs_fields}, {comp_fields}  Output fields: {output_fields}")
         # Model parameters
         filter_size = int(in_df["Model_params"].item().split(':')[1])
         config[ModelParams.FILTER_SIZE] = filter_size
@@ -70,10 +77,6 @@ def main():
         config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(comp_fields)
         config[ProjTrainingParams.rows] = grows
         config[ProjTrainingParams.cols] = gcols
-        # Setting output vars
-        # output_fields = getOutputFields(name)
-        # config[ProjTrainingParams.output_fields] = output_fields
-        config[ProjTrainingParams.output_fields] = ['srfhgt', 'temp']
         # Setting model weights file
         config[PredictionParams.model_weights_file] = join(model["Path"],model["Name"])
         print(F"Model's weight file: {config[PredictionParams.model_weights_file]}")
@@ -276,24 +279,24 @@ def test_model(config):
             ssh_diff_idx = len(field_names)
             model_ssh_idx = 1 # TODO review this is the SSH index for th emodel
 
-            # Smooths SSH (Assumes the first obs field is always SSH)
-            temp_field = denorm_input[:,:,obs_ssh_idx]  # Selects SSH
-            temp_field = np.nan_to_num(temp_field, 0)
-            temp_field = gaussian_filter(temp_field, 1)
-            temp_field[np.logical_and(temp_field >= -eps, temp_field <= eps)] = np.nan
-            denorm_input[:,:,obs_ssh_idx] = temp_field
-
-            # # Smooths DIFF_SSH (assumes it is the first composite field)
-            temp_field = denorm_input[:,:,ssh_diff_idx] # Reads the "DIFF" field
-            temp_field = np.nan_to_num(temp_field, 0)
-            temp_field = gaussian_filter(temp_field, 1)
-            # temp_field[temp_field == 0] = np.nan
-            temp_field[np.logical_and(temp_field >= -eps, temp_field <= eps)] = np.nan
-            temp2 = denorm_y[:, :, model_ssh_idx].copy()
-            temp_idxs = np.logical_not(np.isnan(temp_field))
-            temp2[temp_idxs] = temp_field[temp_idxs]
-            # denorm_input[:,:,ssh_diff_idx] = temp2 # Reassigned the input diff
-            denorm_input[:,:,ssh_diff_idx] = temp_field# Only smoothed diff
+            # # Smooths SSH (Assumes the first obs field is always SSH)
+            # temp_field = denorm_input[:,:,obs_ssh_idx]  # Selects SSH
+            # temp_field = np.nan_to_num(temp_field, 0)
+            # temp_field = gaussian_filter(temp_field, 1)
+            # temp_field[np.logical_and(temp_field >= -eps, temp_field <= eps)] = np.nan
+            # denorm_input[:,:,obs_ssh_idx] = temp_field
+            #
+            # # # Smooths DIFF_SSH (assumes it is the first composite field)
+            # temp_field = denorm_input[:,:,ssh_diff_idx] # Reads the "DIFF" field
+            # temp_field = np.nan_to_num(temp_field, 0)
+            # temp_field = gaussian_filter(temp_field, 1)
+            # # temp_field[temp_field == 0] = np.nan
+            # temp_field[np.logical_and(temp_field >= -eps, temp_field <= eps)] = np.nan
+            # temp2 = denorm_y[:, :, model_ssh_idx].copy()
+            # temp_idxs = np.logical_not(np.isnan(temp_field))
+            # temp2[temp_idxs] = temp_field[temp_idxs]
+            # # denorm_input[:,:,ssh_diff_idx] = temp2 # Reassigned the input diff
+            # denorm_input[:,:,ssh_diff_idx] = temp_field# Only smoothed diff
             #
             # # Smooths Observations
             # temp_field = denorm_input[:,:,len(field_names) + 1] # Reads the "DIFF" field
@@ -380,8 +383,8 @@ def getMinMaxCbar(fields):
             maxcbar.append(.4)
             mincbar.append(-.4)
         elif c_field == "temp_out" :
-            maxcbar.append(1.)
-            mincbar.append(-1.)
+            maxcbar.append(2.)
+            mincbar.append(-2.)
         elif c_field == "diff_ssh":
             maxcbar.append(0.4)
             mincbar.append(-0.4)

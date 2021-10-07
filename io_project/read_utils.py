@@ -301,6 +301,10 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
             temp_data = depth_mask[start_row:end_row, start_col:end_col]
         else:
             temp_data = input_fields_model[c_field][0, start_row:end_row, start_col:end_col]
+            c_perc_ocean = (temp_data.size - np.count_nonzero(np.isnan(temp_data)))/temp_data.size
+            # We only validate ocean in non composite fields
+            if c_perc_ocean < perc_ocean: # 99% ocean
+                raise Exception(F"Not mostly ocean {c_field}")
 
         if c_field == "thknss":
             divide = 9806
@@ -308,22 +312,18 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
         if c_field == "srfhgt":
             divide = 9.806
             temp_data = temp_data/divide
+
+        # TODO couldn't find a better way to check that there are not 'land' pixels. IF YOU CHANGE IT YOU NEED TO BE SURE IT IS WORKING!!!!!!
+        input_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_model,
+                                                   norm_type=norm_type, normalize=True)
+        if id_field == 0:
+            c_mask = ma.getmaskarray(temp_data)
+        id_field += 1
         # For debugging
         # import matplotlib.pyplot as plt
         # plt.imshow(temp_data.data)
         # plt.title(c_field)
         # plt.show()
-        # TODO couldn't find a better way to check that there are not 'land' pixels. IF YOU CHANGE IT YOU NEED TO BE SURE IT IS WORKING!!!!!!
-        c_perc_ocean = (temp_data.size - np.count_nonzero(np.isnan(temp_data)))/temp_data.size
-        if c_perc_ocean >= perc_ocean: # 99% ocean
-            input_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_model,
-                                                       norm_type=norm_type, normalize=True)
-            # input_data[:, :, id_field] = temp_data
-            if id_field == 0:
-                c_mask = ma.getmaskarray(temp_data)
-            id_field += 1
-        else:
-            raise Exception("Not mostly ocean")
 
     # ******* Adding the observations fields for input ********
     for c_field in obs_field_names:

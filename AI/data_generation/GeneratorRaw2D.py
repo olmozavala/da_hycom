@@ -103,7 +103,7 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
                                                         start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
                     # start_row, start_col, rows, cols, norm_type=PreprocParams.no_norm, perc_ocean=perc_ocean)
                 except Exception as e:
-                    print(F"Failed for {model_file_name}: {e}")
+                    # print(F"Failed for {model_file_name} {start_row}-{start_col}: {e}")
                     continue
 
                 succ_attempts += 1
