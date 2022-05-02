@@ -1,0 +1,9 @@
+[submodule "ai-common"]
+	path = ai_common
+	url = git@github.com:olmozavala/ai-common.git
+[submodule "hycom_utils"]
+	path = hycom_utils
+	url = git@github.com:HYCOM/HYCOM-utilities.git
+[submodule "eoas_pyutils"]
+	path = eoas_pyutils
+	url = git@github.com:olmozavala/eoas-pyutils.git

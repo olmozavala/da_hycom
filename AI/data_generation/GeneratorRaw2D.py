@@ -1,15 +1,16 @@
+# External
 import numpy as np
-from inout.io_netcdf import read_netcdf, read_netcdf_xr
-from io_project.read_utils import generateXandY2D, generateXandYMulti, get_date_from_preproc_filename
-from os.path import join, exists
-from constants_proj.AI_proj_params import MAX_MODEL, MAX_OBS, MIN_OBS, MIN_MODEL, MAX_INCREMENT, MIN_INCREMENT
-import os
-from inout.io_hycom import read_hycom_fields
-from constants_proj.AI_proj_params import ProjTrainingParams, PreprocParams
-from constants.AI_params import TrainingParams
-from img_viz.eoa_viz import EOAImageVisualizer
-from constants.AI_params import AiModels, ModelParams
+from os.path import join
 from datetime import datetime,timedelta
+import os
+# Common
+from inout.io_netcdf import read_netcdf, read_netcdf_xr
+from inout.io_hycom import read_hycom_fields
+from ai_common.constants.AI_params import TrainingParams,AiModels, ModelParams
+from img_viz.eoa_viz import EOAImageVisualizer
+# From project
+from io_project.read_utils import generateXandY2D, generateXandYMulti, get_date_from_preproc_filename
+from constants_proj.AI_proj_params import ProjTrainingParams, PreprocParams
 
 def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names, output_fields, z_layers=[0],
                       examples_per_figure=10, perc_ocean=0, composite_field_names=[]):
@@ -118,6 +119,7 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
                 # import matplotlib.pyplot as plt
                 # from scipy.ndimage import convolve, gaussian_filter
                 # import cmocean
+                # from eoas_utils.VizUtilsProj import chooseCMAP
                 # # mincbar = np.nanmin(input_data)
                 # # maxcbar = np.nanmax(input_data)
                 # output_folder = config[TrainingParams.output_folder]
@@ -125,16 +127,16 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
                 # X[0,:,:,2] = np.nan_to_num(X[0,:,:,2], 0 )
                 # X[0,:,:,3] = np.nan_to_num(X[0,:,:,3], 0 )
                 # # Apply gaussian filter
-                # X[0,:,:,2] = gaussian_filter(X[0,:,:,2], 2)
-                # X[0,:,:,3] = gaussian_filter(X[0,:,:,3], 2)
+                # # X[0,:,:,2] = gaussian_filter(X[0,:,:,2], 2)
+                # # X[0,:,:,3] = gaussian_filter(X[0,:,:,3], 2)
                 #
-                # # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=False, mincbar=mincbar, maxcbar=maxcbar)
                 # viz_obj = EOAImageVisualizer(output_folder=join(output_folder, "training_imgs"), disp_images=False)
                 # viz_obj.plot_2d_data_np(np.rollaxis(X[0,:,:,:],2,0),
                 #                             var_names=[F"in_model_{x}" for x in field_names+composite_field_names] +
                 #                                       [F"in_obs_{x}" for x in obs_field_names],
                 #                             flip_data=True,
-                #                             cmap=cmocean.cm.curl,
+                #                             cmap=[cmocean.cm.thermal, cmocean.cm.curl,cmocean.cm.curl,cmocean.cm.thermal,cmocean.cm.curl],
+                #                             # cmap=cmocean.cm.curl,
                 #                             file_name_prefix=F"{c_id}_{start_col}_{start_row}",
                 #                             title=F"")
                 #

@@ -1,4 +1,4 @@
-from constants.AI_params import AiModels
+from ai_common.constants.AI_params import AiModels
 from constants_proj.AI_proj_params import NetworkTypes
 
 def getCompleteNameTxt(name):
@@ -37,7 +37,7 @@ def getNeworkArchitectureAndTypeFromName(networkName):
         return AiModels.UNET_2D_SINGLE, NetworkTypes.UNET
 
 def getInputFieldsTxt(name):
-    sections = name[name.find("IN"):].split("_")
+    sections = name[name.find("srfhgt"):].split("_")
     in_fields = sections[1]
     if "WSSH" in name:
         in_fields += ", SSH"

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from config.MainConfig_2D import get_training
-from constants.AI_params import TrainingParams, ModelParams
+from ai_common.constants.AI_params import TrainingParams, ModelParams
 from constants_proj.AI_proj_params import ProjTrainingParams
 from img_viz.common import create_folder
 
@@ -136,12 +136,12 @@ if __name__ == '__main__':
 
     all_folders = os.listdir(trained_models_folder)
     all_folders.sort()
-    print(all_folders)
 
     summary = []
 
     # Iterate over all the experiments
     for experiment in all_folders:
+        print(F"Working with experiment: {experiment}")
         if experiment == "training_imgs":
             break
         all_models = os.listdir(join(trained_models_folder, experiment , "models"))
@@ -163,6 +163,7 @@ if __name__ == '__main__':
     def_in = "ssh"
     def_out = "SRFHGT"
     def_perc_ocean = "0.0"
+
     # ========= Compare Network type ======
     c_summary = summary[np.logical_and((summary[IN] == def_in).values, (summary[OUT] == def_out).values)]
     c_summary = c_summary[c_summary["BBOX"] == def_bbox]

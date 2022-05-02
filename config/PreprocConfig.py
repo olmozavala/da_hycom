@@ -1,6 +1,6 @@
 from os.path import join
 from constants_proj.AI_proj_params import *
-from img_viz.constants import PlotMode
+from eoas_pyutils.viz_utils.constants import PlotMode
 import numpy as np
 
 # ----------------------------- UM -----------------------------------

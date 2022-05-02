@@ -1,38 +1,41 @@
 import os
+from os import listdir
+import sys
 
 import matplotlib.pyplot as plt
 from scipy.ndimage import convolve, zoom, median_filter, maximum_filter, gaussian_filter, minimum_filter, percentile_filter, spline_filter
 from io_project.read_utils import generateXandY2D, normalizeData
 
 from tensorflow.keras.utils import plot_model
-from inout.io_netcdf import read_netcdf, read_netcdf_xr
+from io_utils.io_netcdf import read_netcdf, read_netcdf_xr
+from io_utils.io_common import create_folder
 from os.path import join
 import numpy as np
 import pandas as pd
 import time
 import cmocean
 
-from img_viz.eoa_viz import EOAImageVisualizer
 from config.MainConfig_2D import get_prediction_params
 from constants_proj.AI_proj_params import PredictionParams, ProjTrainingParams, PreprocParams
 from config.PreprocConfig import get_preproc_config
-from models.modelSelector import select_2d_model
+from ai_common.models.modelSelector import select_2d_model
 from models_proj.models import *
-from constants.AI_params import TrainingParams, ModelParams
-from img_viz.common import create_folder
+from ai_common.constants.AI_params import TrainingParams, ModelParams
 from datetime import datetime, timedelta
-from inout.io_hycom import read_hycom_fields
-from os import listdir
 
 from sklearn.metrics import mean_squared_error
 
 from ExtraUtils.NamesManipulation import *
-from eoas_utils.VizUtilsProj import chooseCMAP, getMinMaxPlot
+from viz_utils.eoa_viz import EOAImageVisualizer
+from viz_utils.eoa_viz import select_colormap
+
+sys.path.append("hycom_utils/python")
+from hycom.io import read_hycom_fields, read_hycom_coords, read_field_names
 
 def main():
 
     config = get_prediction_params()
-    # -------- For single model testing --------------
+    # -------- For single model testing (not easy to test because everything must be defined in MainConfig_2D.py)--------------
     # print("Testing single model....")
     # test_model(config)
 
@@ -42,9 +45,11 @@ def main():
     df = pd.read_csv(summary_file)
 
     for model_id in range(len(df)):
-        model = df.iloc[model_id]
+        # model = df.iloc[model_id]
+        model = df.iloc[33]
         # Setting Network type (only when network type is UNET)
         name = model["Name"]
+        print(F"Model id: {model_id}, name: {name}")
         network_arch, network_type = getNeworkArchitectureAndTypeFromName(getNetworkTypeTxt(name))
         config[ModelParams.MODEL] = network_arch
         config[ProjTrainingParams.network_type] = network_type
@@ -84,6 +89,7 @@ def main():
         run_name = model["Path"].replace("/models","").split("/")[-1]  # The runname
         config[TrainingParams.config_name] = run_name
         test_model(config)
+        exit()
 
 def test_model(config):
     input_folder = config[PredictionParams.input_folder]
@@ -100,8 +106,8 @@ def test_model(config):
     norm_type = config[ProjTrainingParams.norm_type]
     preproc_config = get_preproc_config()
 
-    input_folder_background =   preproc_config[PreprocParams.input_folder_hycom]
-    input_folder_increment =    preproc_config[PreprocParams.input_folder_tsis]
+    input_folder_background = preproc_config[PreprocParams.input_folder_hycom]
+    input_folder_increment =  preproc_config[PreprocParams.input_folder_tsis]
     input_folder_observations = preproc_config[PreprocParams.input_folder_obs]
 
     output_imgs_folder = join(output_imgs_folder, run_name)
@@ -149,12 +155,12 @@ def test_model(config):
     cminmax_error = getMinMaxCbar([F"error_{x}" for x in output_fields])
 
     # Selects the colormap to use for each field
-    cmap_out = chooseCMAP(output_fields)
-    cmap_model = chooseCMAP(field_names)
-    cmap_comp = chooseCMAP(comp_field_names)
-    cmap_obs = chooseCMAP(obs_field_names)
-    cmap_std = chooseCMAP(field_names_std)
-    cmap_error = chooseCMAP([F"error_{x}" for x in output_fields])
+    cmap_out =   [select_colormap(x) for x in output_fields]
+    cmap_model = [select_colormap(x) for x in field_names]
+    cmap_comp =  [select_colormap(x) for x in comp_field_names]
+    cmap_obs =   [select_colormap(x) for x in obs_field_names]
+    cmap_std =   [select_colormap(x) for x in field_names_std]
+    cmap_error = [F"error{select_colormap(x)}" for x in output_fields]
 
     # Selects the colormap label to use for each field
     cmap_label_out = getFieldUnits(output_fields)
@@ -171,8 +177,16 @@ def test_model(config):
     tot_rows = 384
     tot_cols = 525
 
-    start_test_idx = 583+73
+    start_test_idx = 576+73
 
+    coords_file = "/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/topo/regional.grid.a"
+    print(F"The coords available are: {read_field_names(coords_file)}")
+    coords = read_hycom_coords(coords_file, ['plon:', 'plat:'])
+    lons = coords['plon']
+    lats = coords['plat']
+    print("Done!")
+
+    # Only doing it for the TEST dataset
     for id_file, c_file in enumerate(increment_files[start_test_idx:]):
     # for id_file, c_file in enumerate(increment_files):
         # Find current and next date
@@ -188,6 +202,7 @@ def test_model(config):
 
         # *********************** Reading files **************************
         input_fields_model = read_hycom_fields(model_file_name, field_names, z_layers)
+
         input_fields_obs = read_netcdf_xr(obs_file_name, obs_field_names, z_layers)
         output_field_increment = read_hycom_fields(increment_file_name, output_fields, z_layers)
 
@@ -249,8 +264,7 @@ def test_model(config):
         land_indexes = y_data == -0.5
         denorm_y[land_indexes] = np.nan
 
-
-    # Adding back mask to all the input variables
+        # Adding back mask to all the input variables
         denorm_input[input_data_nans] = np.nan
 
         error = denorm_y - denorm_cnn
@@ -263,18 +277,16 @@ def test_model(config):
         all_whole_mean_times.append(np.mean(np.array(this_file_times)))
         all_whole_sum_times.append(np.sum(np.array(this_file_times)))
 
-        # if day_of_year%318 == 0: # Plot 10% of the times
-        if True: # Plot 10% of the times
+        if day_of_year % 300 == 0: # Plot 10% of the times
+        # if True:
             all_cmin = cminmax_model[0]+cminmax_comp[0]+cminmax_obs[0]+cminmax_std[0]+cminmax_out[0]+cminmax_out[0]+cminmax_error[0]
             all_cmax = cminmax_model[1]+cminmax_comp[1]+cminmax_obs[1]+cminmax_std[1]+cminmax_out[1]+cminmax_out[1]+cminmax_error[1]
-            viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
-                                         mincbar=all_cmin,
-                                         maxcbar=all_cmax)
+
             size = 2
             filter = 1/(2**2) * np.ones((size,size))
 
             eps = .001
-            # ------------------ Smoothing fields for visualizaiton -------------
+            # ------------------ Smoothing fields for visualization -------------
             obs_ssh_idx = len(field_names) + len(comp_field_names)
             ssh_diff_idx = len(field_names)
             model_ssh_idx = 1 # TODO review this is the SSH index for th emodel
@@ -308,34 +320,41 @@ def test_model(config):
             rmse_txts =[F"{rmse_cnn[i]:0.4f}" for i,x in enumerate(output_fields)]
 
             # # ================== Displays ALL ================
-            viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_input.swapaxes(0,2), denorm_y.swapaxes(0,2), denorm_cnn.swapaxes(0,2), error.swapaxes(0,2))),
+            viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
+                                         lats=lats, lons=lons,
+                                         max_imgs_per_row=5,
+                                         show_var_names=True )
+            viz_obj.plot_2d_data_np(np.concatenate((denorm_input.swapaxes(0,2), denorm_y.swapaxes(0,2), denorm_cnn.swapaxes(0,2), error.swapaxes(0,2))),
                                         var_names=[F"in_model_{x}" for x in field_names] +
                                                   [F"in_comp_{x}" for x in comp_field_names] +
                                                   [F"in_obs_{x}" for x in obs_field_names] +
                                                   [F"out_inc_{x} (MAE {np.nanmean(np.abs(denorm_y[:,:,i])):0.2f})" for i,x in enumerate(output_fields)] +
                                                   [F"cnn_{x}" for x in output_fields] +
                                                   [F"Difference RMSE {rmse_cnn[i]:0.4f} MAE {mae_cnn[i]:0.4f}" for i, x in enumerate(output_fields)],
-                                        file_name=F"Global_Input_and_CNN_{sp_name}",
+                                        file_name_prefix=F"Global_Input_and_CNN_{sp_name}",
                                         rot_90=True,
+                                        flip_data=True,
                                         cmap=cmap_model+cmap_comp+cmap_obs+cmap_std+cmap_out+cmap_out+cmap_error,
-                                        cmap_labels=cmap_label_model+cmap_label_comp+cmap_label_obs+cmap_label_out+cmap_label_out+cmap_label_error,
+                                        # cmap_labels=cmap_label_model+cmap_label_comp+cmap_label_obs+cmap_label_out+cmap_label_out+cmap_label_error,
                                         # cols_per_row=len(field_names),
-                                        cols_per_row=4,
                                         # title=F"Input data: {field_names} and obs {obs_field_names}, increment {output_fields}, cnn {output_fields}")
+                                        mincbar=all_cmin,maxcbar=all_cmax,
                                         title=F"RMSE {rmse_txts} m {sp_name}")
 
             # # ================== Displays only CNN and TSIS with RMSE ================
             viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
-                                         mincbar=cminmax_out[0]+cminmax_out[0]+cminmax_error[0],
-                                         maxcbar=cminmax_out[1]+cminmax_out[1]+cminmax_error[1])
-
-            viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_y.swapaxes(0,2), denorm_cnn.swapaxes(0,2), error.swapaxes(0,2))),
-                                        var_names=[F"TSIS {x}" for x in output_fields] + [F"CNN {x}" for x in output_fields] + [F'TSIS - CNN \n (Mean RMSE {rmse_cnn[i]:0.4f} m)' for i in range(len(output_fields))],
-                                        file_name=F"Global_WholeOutput_CNN_TSIS_{sp_name}",
+                                         max_imgs_per_row=3,
+                                         lats=lats, lons=lons,
+                                        show_var_names = True )
+            viz_obj.plot_2d_data_np(np.concatenate((denorm_y.swapaxes(0,2), denorm_cnn.swapaxes(0,2), error.swapaxes(0,2))),
+                                        var_names=[F"TSIS {x}" for x in output_fields] + [F"CNN {x}" for x in output_fields] + [F'TSIS - CNN \n (Mean RMSE {rmse_cnn[i]:0.4f} C)' for i in range(len(output_fields))],
+                                        file_name_prefix=F"Global_WholeOutput_CNN_TSIS_{sp_name}",
                                         rot_90=True,
+                                        flip_data=True,
                                         cmap=cmap_out+cmap_out+cmap_error,
-                                        cmap_labels=cmap_label_out+cmap_label_out+cmap_label_error,
-                                        cols_per_row=2,
+                                        mincbar=cminmax_out[0] + cminmax_out[0] + cminmax_error[0],
+                                        maxcbar=cminmax_out[1] + cminmax_out[1] + cminmax_error[1],
+                                        # cmap_labels=cmap_label_out+cmap_label_out+cmap_label_error,
                                         title=F"RMSE {rmse_txts} m {sp_name}")
 
             print("DONE ALL FILES!!!!!!!!!!!!!")
@@ -398,11 +417,11 @@ def getMinMaxCbar(fields):
             maxcbar.append(np.nan)
             mincbar.append(np.nan)
         elif c_field == "error_srfhgt":
-            maxcbar.append(0.4)
-            mincbar.append(-0.4)
+            maxcbar.append(0.2)
+            mincbar.append(-0.2)
         elif c_field == "error_temp":
-            maxcbar.append(0.5)
-            mincbar.append(-0.5)
+            maxcbar.append(2.0)
+            mincbar.append(-2.0)
         else:
             maxcbar.append(np.nan)
             mincbar.append(np.nan)

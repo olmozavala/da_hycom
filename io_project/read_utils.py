@@ -1,4 +1,4 @@
-from preproc.UtilsDates import get_days_from_month
+from io_utils.dates_utils import get_days_from_month
 from constants_proj.AI_proj_params import PreprocParams
 import pandas as pd
 from pandas import DataFrame

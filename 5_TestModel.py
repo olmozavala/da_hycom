@@ -2,24 +2,24 @@ import os
 from io_project.read_utils import generateXandY2D, normalizeData
 
 from tensorflow.keras.utils import plot_model
-from inout.io_netcdf import read_netcdf
+from io_utils.io_netcdf import read_netcdf
 from os.path import join
 import numpy as np
 import pandas as pd
 import time
 
-from img_viz.eoa_viz import EOAImageVisualizer
+from viz_utils.eoa_viz import EOAImageVisualizer
 from config.MainConfig_2D import get_prediction_params
 from constants_proj.AI_proj_params import PredictionParams, ProjTrainingParams, PreprocParams
-from models.modelSelector import select_2d_model
+from ai_common.models.modelSelector import select_2d_model
 from models_proj.models import *
-from constants.AI_params import TrainingParams, ModelParams
-from img_viz.common import create_folder
+from ai_common.constants.AI_params import TrainingParams, ModelParams
+from proj_utils.common import create_folder
 
 from sklearn.metrics import mean_squared_error
 
 from ExtraUtils.NamesManipulation import *
-from eoas_utils.VizUtilsProj import chooseCMAP
+from viz_utils.eoa_viz import select_colormap
 import cmocean
 
 def denormalizeData(input, fields, data_type, norm_type):
@@ -55,45 +55,49 @@ def verifyBoundaries(start_col, cols, tot_cols):
 def main():
 
     config = get_prediction_params()
-    # -------- For single model testing --------------
-    test_model(config)
+    # -------- For single model testing (not that easy to use because everything needs to be defined in MainConfig_2D.py--------------
+    # test_model(config)
 
     # -------- For all summary model testing --------------
-    # summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
-    # # summary_file = "/home/data/MURI/output/SUMMARY/summary.csv"
-    # df = pd.read_csv(summary_file)
-    # for model_id in range(len(df)):
-    #     model = df.iloc[model_id]
-    #
-    #     # Setting Network type (only when network type is UNET)
-    #     name = model["Name"]
-    #     network_arch, network_type = getNeworkArchitectureAndTypeFromName(getNetworkTypeTxt(name))
-    #     config[ModelParams.MODEL] = network_arch
-    #     config[ProjTrainingParams.network_type] = network_type
-    #     # Setting input vars
-    #     # model_fields, obs_fields, var_fields = getInputFields(name)
-    #     var_fields = getInputVarFields(name)
-    #     model_fields = config[ProjTrainingParams.fields_names]
-    #     obs_fields = config[ProjTrainingParams.fields_names_obs]
-    #     print(F"Input fields: {model_fields}, {obs_fields}, {var_fields}")
-    #     # config[ProjTrainingParams.fields_names] = model_fields
-    #     # config[ProjTrainingParams.fields_names_obs] = obs_fields
-    #     config[ProjTrainingParams.fields_names_var] = var_fields
-    #     # Setting BBOX
-    #     train_rows, train_cols = [int(x) for x in model["BBOX"].split("x")]
-    #     config[ModelParams.INPUT_SIZE][0] = train_rows
-    #     config[ModelParams.INPUT_SIZE][1] = train_cols
-    #     config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(var_fields)
-    #     # Setting output vars
-    #     output_fields = getOutputFields(name)
-    #     config[ProjTrainingParams.output_fields] = output_fields
-    #     # Setting model weights file
-    #     config[PredictionParams.model_weights_file] = model["Path"]
-    #     print(F"Model's weight file: {model['Path']}")
-    #     # Set the name of the network
-    #     run_name = name.replace(".hdf5", "")
-    #     config[TrainingParams.config_name] = run_name
-    #     test_model(config)
+    summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
+    # summary_file = "/home/data/MURI/output/SUMMARY/summary.csv"
+    df = pd.read_csv(summary_file)
+    for model_id in range(len(df)):
+        # model = df.iloc[model_id]
+        model = df.iloc[33]
+
+        # Setting Network type (only when network type is UNET)
+        name = model["Name"]
+        print(F"Working with model name: {name}")
+        network_arch, network_type = getNeworkArchitectureAndTypeFromName(getNetworkTypeTxt(name))
+        config[ModelParams.MODEL] = network_arch
+        config[ProjTrainingParams.network_type] = network_type
+        # Setting input vars
+        # model_fields, obs_fields, var_fields = getInputFields(name)
+        # var_fields = getInputVarFields(name)
+        var_fields = []
+        model_fields = config[ProjTrainingParams.fields_names]
+        obs_fields = config[ProjTrainingParams.fields_names_obs]
+        print(F"Input fields: {model_fields}, {obs_fields}, {var_fields}")
+        # config[ProjTrainingParams.fields_names] = model_fields
+        # config[ProjTrainingParams.fields_names_obs] = obs_fields
+        config[ProjTrainingParams.fields_names_var] = var_fields
+        # Setting BBOX
+        train_rows, train_cols = [int(x) for x in model["BBOX"].split("x")]
+        config[ModelParams.INPUT_SIZE][0] = train_rows
+        config[ModelParams.INPUT_SIZE][1] = train_cols
+        config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(var_fields)
+        # Setting output vars
+        output_fields = getOutputFields(name)
+        config[ProjTrainingParams.output_fields] = output_fields
+        # Setting model weights file
+        config[PredictionParams.model_weights_file] = model["Path"]
+        print(F"Model's weight file: {model['Path']}")
+        # Set the name of the network
+        run_name = name.replace(".hdf5", "")
+        config[TrainingParams.config_name] = run_name
+        test_model(config)
+        exit()
 
     # In this case we test all the best models
 
@@ -146,10 +150,10 @@ def test_model(config):
     else:
         input_fields_std = []
 
-    cmap_out = chooseCMAP(output_fields)
-    cmap_model = chooseCMAP(field_names_model)
-    cmap_obs = chooseCMAP(field_names_obs)
-    cmap_std = chooseCMAP(field_names_std)
+    cmap_out = [select_colormap(x) for x in output_fields]
+    cmap_model = [select_colormap(x) for x in field_names_model]
+    cmap_obs = [select_colormap(x) for x in field_names_obs]
+    cmap_std = [select_colormap(x) for x in field_names_std]
 
     tot_rows = 891
     tot_cols = 1401
@@ -301,7 +305,7 @@ def test_model(config):
 
                     # ================== Displays CNN and TSIS with RMSE ================
                     viz_obj.output_folder = join(output_imgs_folder,'JoinedErrrorCNN')
-                    cmap = chooseCMAP(output_fields)
+                    cmap = [select_colormap(x) for x in output_fields]
                     error_cmap = cmocean.cm.diff
                     viz_obj.plot_2d_data_np_raw(np.concatenate((denorm_cnn_output.swapaxes(0,2), denorm_y.swapaxes(0,2), error), axis=0),
                                                  var_names=[F"CNN INC {x}" for x in output_fields] + [F"TSIS INC {x}" for x in output_fields] + [F'RMSE {c_rmse_cnn:0.4f}' for c_rmse_cnn in rmse_cnn],

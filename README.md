@@ -32,13 +32,20 @@ the number of layers and fields.
 This is the main file that trains new models depending on the
 `MainConfig_2D.py` configuration file
 
+### *4_Summary_of_Models*
+Iterates over all the trained configurations in the *Training* folder,
+and for each configuration it saves the model with the lowest
+validation error into a `csv` file. This file is useful because it
+contains a list to the best model for each configuration tested.
+
 ### *4_TestModel*
 **Currently doesn't work!!!!!!**. It reads preproc netcdf files.
-This file is used for two options: 
+This file is used for two options:
 1) Single model evaluation. In this case the user needs to specify wich
-weights file to use in `MainConfig.py` and the configuration inside
-   this file should match the model being tested. 
-   
+   weights file to use in `MainConfig.py` and the configuration inside
+   this file should match the model being tested.
+2)
+
 ### *4_TestModel_Whole*
 It uses the `get_preproc_config` from `PreprocConfig.py` to identify
 which folders to use for reading hycom, tsis, and observation data.
@@ -46,12 +53,6 @@ This file is used for two options:
 1) Single model evaluation. In this case the user needs to specify wich
    weights file to use in `MainConfig.py` and the configuration inside
    this file should match the model being tested.
-
-### *5_Summary_of_Models*
-Iterates over all the trained configurations in the *Training* folder,
-and for each configuration it saves the model with the lowest
-validation error into a `csv` file. This file is useful because it
-contains a list to the best model for each configuration tested. 
 
 ### *6_RMSE_Plot*
 This file simply plots the RMSE obtained from the

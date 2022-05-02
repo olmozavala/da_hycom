@@ -1,7 +1,10 @@
+# External
 from tensorflow.keras.layers import *
-import models.modelBuilder2D as model_builder_2d
 from tensorflow.keras.models import Model
-from constants.AI_params import ModelParams
+# Common
+import ai_common.models.modelBuilder2D as model_builder_2d
+from ai_common.constants.AI_params import ModelParams
+# This project
 
 
 def simpleSimplest(model_params):
