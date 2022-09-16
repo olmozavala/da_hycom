@@ -2,8 +2,6 @@ import os
 from os import listdir
 import sys
 
-import matplotlib.pyplot as plt
-from scipy.ndimage import convolve, zoom, median_filter, maximum_filter, gaussian_filter, minimum_filter, percentile_filter, spline_filter
 from io_project.read_utils import generateXandY2D, normalizeData
 
 from tensorflow.keras.utils import plot_model
@@ -13,7 +11,6 @@ from os.path import join
 import numpy as np
 import pandas as pd
 import time
-import cmocean
 
 from config.MainConfig_2D import get_prediction_params
 from constants_proj.AI_proj_params import PredictionParams, ProjTrainingParams, PreprocParams
@@ -23,14 +20,14 @@ from models_proj.models import *
 from ai_common.constants.AI_params import TrainingParams, ModelParams
 from datetime import datetime, timedelta
 
-from sklearn.metrics import mean_squared_error
-
 from ExtraUtils.NamesManipulation import *
 from viz_utils.eoa_viz import EOAImageVisualizer
 from viz_utils.eoa_viz import select_colormap
 
 sys.path.append("hycom_utils/python")
 from hycom.io import read_hycom_fields, read_hycom_coords, read_field_names
+
+
 
 def main():
 
@@ -224,7 +221,7 @@ def test_model(config):
             input_data, y_data = generateXandY2D(input_fields_model, input_fields_obs, input_fields_std, output_field_increment,
                                                  field_names+comp_field_names, obs_field_names, field_names_std, output_fields,
                                                  0, 0, tot_rows, tot_cols, norm_type=norm_type, perc_ocean=perc_ocean)
-                                                # start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
+            # start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
         except Exception as e:
             print(F"Exception {e}")
 
@@ -289,7 +286,7 @@ def test_model(config):
         all_whole_sum_times.append(np.sum(np.array(this_file_times)))
 
         if day_of_year % 300 == 0: # Plot 10% of the times
-        # if True:
+            # if True:
             all_cmin = cminmax_model[0]+cminmax_comp[0]+cminmax_obs[0]+cminmax_std[0]+cminmax_out[0]+cminmax_out[0]+cminmax_error[0]
             all_cmax = cminmax_model[1]+cminmax_comp[1]+cminmax_obs[1]+cminmax_std[1]+cminmax_out[1]+cminmax_out[1]+cminmax_error[1]
 
@@ -336,37 +333,37 @@ def test_model(config):
                                          max_imgs_per_row=5,
                                          show_var_names=True )
             viz_obj.plot_2d_data_np(np.concatenate((denorm_input.swapaxes(0,2), denorm_y.swapaxes(0,2), denorm_cnn.swapaxes(0,2), error.swapaxes(0,2))),
-                                        var_names=[F"in_model_{x}" for x in field_names] +
-                                                  [F"in_comp_{x}" for x in comp_field_names] +
-                                                  [F"in_obs_{x}" for x in obs_field_names] +
-                                                  [F"out_inc_{x} (MAE {np.nanmean(np.abs(denorm_y[:,:,i])):0.2f})" for i,x in enumerate(output_fields)] +
-                                                  [F"cnn_{x}" for x in output_fields] +
-                                                  [F"Difference RMSE {rmse_cnn[i]:0.4f} MAE {mae_cnn[i]:0.4f}" for i, x in enumerate(output_fields)],
-                                        file_name_prefix=F"Global_Input_and_CNN_{sp_name}",
-                                        rot_90=True,
-                                        flip_data=True,
-                                        cmap=cmap_model+cmap_comp+cmap_obs+cmap_std+cmap_out+cmap_out+cmap_error,
-                                        # cmap_labels=cmap_label_model+cmap_label_comp+cmap_label_obs+cmap_label_out+cmap_label_out+cmap_label_error,
-                                        # cols_per_row=len(field_names),
-                                        # title=F"Input data: {field_names} and obs {obs_field_names}, increment {output_fields}, cnn {output_fields}")
-                                        mincbar=all_cmin,maxcbar=all_cmax,
-                                        title=F"RMSE {rmse_txts} m {sp_name}")
+                                    var_names=[F"in_model_{x}" for x in field_names] +
+                                              [F"in_comp_{x}" for x in comp_field_names] +
+                                              [F"in_obs_{x}" for x in obs_field_names] +
+                                              [F"out_inc_{x} (MAE {np.nanmean(np.abs(denorm_y[:,:,i])):0.2f})" for i,x in enumerate(output_fields)] +
+                                              [F"cnn_{x}" for x in output_fields] +
+                                              [F"Difference RMSE {rmse_cnn[i]:0.4f} MAE {mae_cnn[i]:0.4f}" for i, x in enumerate(output_fields)],
+                                    file_name_prefix=F"Global_Input_and_CNN_{sp_name}",
+                                    rot_90=True,
+                                    flip_data=True,
+                                    cmap=cmap_model+cmap_comp+cmap_obs+cmap_std+cmap_out+cmap_out+cmap_error,
+                                    # cmap_labels=cmap_label_model+cmap_label_comp+cmap_label_obs+cmap_label_out+cmap_label_out+cmap_label_error,
+                                    # cols_per_row=len(field_names),
+                                    # title=F"Input data: {field_names} and obs {obs_field_names}, increment {output_fields}, cnn {output_fields}")
+                                    mincbar=all_cmin,maxcbar=all_cmax,
+                                    title=F"RMSE {rmse_txts} m {sp_name}")
 
             # # ================== Displays only CNN and TSIS with RMSE ================
             viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
                                          max_imgs_per_row=3,
                                          lats=lats, lons=lons,
-                                        show_var_names = True )
+                                         show_var_names = True )
             viz_obj.plot_2d_data_np(np.concatenate((denorm_y.swapaxes(0,2), denorm_cnn.swapaxes(0,2), error.swapaxes(0,2))),
-                                        var_names=[F"TSIS {x}" for x in output_fields] + [F"CNN {x}" for x in output_fields] + [F'TSIS - CNN \n (Mean RMSE {rmse_cnn[i]:0.4f} C)' for i in range(len(output_fields))],
-                                        file_name_prefix=F"Global_WholeOutput_CNN_TSIS_{sp_name}",
-                                        rot_90=True,
-                                        flip_data=True,
-                                        cmap=cmap_out+cmap_out+cmap_error,
-                                        mincbar=cminmax_out[0] + cminmax_out[0] + cminmax_error[0],
-                                        maxcbar=cminmax_out[1] + cminmax_out[1] + cminmax_error[1],
-                                        # cmap_labels=cmap_label_out+cmap_label_out+cmap_label_error,
-                                        title=F"RMSE {rmse_txts} m {sp_name}")
+                                    var_names=[F"TSIS {x}" for x in output_fields] + [F"CNN {x}" for x in output_fields] + [F'TSIS - CNN \n (Mean RMSE {rmse_cnn[i]:0.4f} C)' for i in range(len(output_fields))],
+                                    file_name_prefix=F"Global_WholeOutput_CNN_TSIS_{sp_name}",
+                                    rot_90=True,
+                                    flip_data=True,
+                                    cmap=cmap_out+cmap_out+cmap_error,
+                                    mincbar=cminmax_out[0] + cminmax_out[0] + cminmax_error[0],
+                                    maxcbar=cminmax_out[1] + cminmax_out[1] + cminmax_error[1],
+                                    # cmap_labels=cmap_label_out+cmap_label_out+cmap_label_error,
+                                    title=F"RMSE {rmse_txts} m {sp_name}")
 
         successful_files.append(c_day_str)
 

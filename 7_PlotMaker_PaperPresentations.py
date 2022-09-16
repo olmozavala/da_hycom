@@ -2,9 +2,32 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import xarray as xr
-from inout.io_netcdf import read_netcdf, read_netcdf_xr
-from inout.io_hycom import read_hycom_fields
+from hycom.io import read_hycom_fields
+import pandas as pd
+from viz_utils.eoa_viz import EOAImageVisualizer
 import cmocean
+
+## For RMSE summary
+rmse_file = "/data/HYCOM/DA_HYCOM_TSIS/PredictionHOY/imgs/0002_GoM2D_STDNORM_PERCOCEAN_0_NET_2DUNET_srfhgt_ssh-ssh-err-sst-sst-err_No-STD_OUT_SRFHGT_384x520/Global_RMSE_and_times.csv"
+# df_all = pd.read_csv(rmse_file, parse_dates=[1])
+df_all = pd.read_csv(rmse_file)
+for year in ("2002", "2006"):
+    df = df_all[df_all.File.str.contains(year)]
+    fig, ax = plt.subplots(1,1, figsize=(7,5))
+    ax.scatter([x.replace("_", "/") for x in df.File], df.rmse, s=1)
+    ax.set_xticks(np.round(range(len(df.File))))
+    plt.xticks(rotation=30)
+    plt.locator_params(nbins=10)
+    plt.subplots_adjust(bottom=0.18)
+    ax.set_title(F"SSH RMSE for year {year} (mean RMSE: {df.rmse.mean():0.4f} m)")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("RMSE of SSH in m")
+    ax.set_ylim((0.002, 0.010))
+    plt.show()
+
+##
+df.File
+
 
 ##  For raster examples
 
@@ -47,7 +70,3 @@ plt.savefig('/home/olmozavala/Dropbox/MyConferencesAndWorkshops/2022/OceanScienc
 plt.show()
 plt.close()
 print("Done!")
-
-
-##
-

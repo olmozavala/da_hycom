@@ -47,15 +47,16 @@ def makeScatter(c_summary, group_field, xlabel, output_file, title_txt="", units
     # plt.show()
     plt.close()
 
-imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/Prediction/imgs"
+imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/Prediction2002_2006/imgs"
 summary_folder = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/"
 
 all_folders = [ name for name in os.listdir(imgs_prediction_folder) if os.path.isdir(os.path.join(imgs_prediction_folder, name)) ]
 all_folders.sort()
 
-# Define the sum2ary_file
+# Define the summary_file
 summary_file = join(summary_folder,"summary.csv")
-output_file = join(summary_folder,"summary_RMSE.csv")
+# output_file = join(summary_folder,"summary_RMSE.csv")
+output_file = join(summary_folder,"summary_RMSE_2002_2006.csv")
 summary_df = pd.read_csv(summary_file)
 training_folder = '/'.join(np.array(os.path.dirname(summary_df.iloc[0]["Path"]).split("/"))[:-1])
 
@@ -63,8 +64,7 @@ training_folder = '/'.join(np.array(os.path.dirname(summary_df.iloc[0]["Path"]).
 # val_id = 291+37
 # For all test plots
 
-# for c_model in all_folders:
-for c_model in all_folders[9:10]:
+for c_model in all_folders:
     print(F"------------------- {c_model} -----------------------")
     c_file = join(imgs_prediction_folder, c_model, "Global_RMSE_and_times.csv")
     # Match summary with model
@@ -77,24 +77,31 @@ for c_model in all_folders[9:10]:
         output_field = getOutputFieldsTxt(c_model)
         if os.path.exists(c_file):
             df = pd.read_csv(c_file)
-            rms_mean = np.array([float(x[1:-1].split(' ')[0]) for x in df["rmse"]])
+            # rms_mean = np.array([float(x[1:-1].split(' ')[0]) for x in df["rmse"]])
+            rms_mean = df["rmse"]
             if np.any(np.isnan(rms_mean)):
                 print(F"Failed for {c_file} {e}")
                 continue
 
-            year_day = [int(x.split("_")[-2])for x in df["File"]]
+            # dates_str = [int(x.split("_")[-2])for x in df["File"]]
+            dates_str = df["File"].values
             if True: # Plot part
+                months = ['F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N']
+                xticks_labels = ['2002'] + months + ['2006'] + months
+                xticks_pos = np.linspace(0, len(dates_str) - 1, len(xticks_labels))
+
                 plt.figure(figsize=(10,5))
-                plt.scatter(year_day, rms_mean)
-                # Only used if you want to plot where the trainging and validation cuts are
-                # plt.axvline(x=year_day[train_id], c='g')
-                # plt.axvline(x=year_day[val_id], c='r')
+                plt.scatter(dates_str, rms_mean)
+                # Only used if you want to plot where the training and validation cuts are
+                # plt.axvline(x=dates_str[train_id], c='g')
+                # plt.axvline(x=dates_str[val_id], c='r')
                 # plt.ylim([0.001,0.03])
                 plt.ylabel('RMSE m')
                 plt.xlabel(F'Day of the year')
                 # plt.title(F"RMSE of SSH prediction by dataset: \n training: {rms_mean.iloc[:train_id].mean():0.3f}  validation:{rms_mean.iloc[train_id:val_id].mean():0.3f} test:{rms_mean.iloc[val_id:].mean():0.3f} ")
-                plt.title(F"{model_title}\nRMSE of SSH prediction of test dataset: {rms_mean.mean():0.4f} ")
+                plt.title(F"{model_title}\nRMSE of SSH prediction of years 2002 and 2006: {rms_mean.mean():0.4f} ")
                 print(join(imgs_prediction_folder, F"{c_model}_RMSE.png"))
+                plt.xticks(xticks_pos, labels=xticks_labels, rotation=0)
                 plt.savefig(join(imgs_prediction_folder, F"{c_model}_RMSE.png") ,bbox_inches='tight', dpi=300)
                 plt.show()
             plt.close()
