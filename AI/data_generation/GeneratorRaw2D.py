@@ -2,12 +2,14 @@
 import numpy as np
 from os.path import join
 from datetime import datetime,timedelta
-import os
+import os, sys
 # Common
-from inout.io_netcdf import read_netcdf, read_netcdf_xr
-from inout.io_hycom import read_hycom_fields
+sys.path.append("eoas_pyutils/")
+sys.path.append("hycom_utils/python")
+from io_utils.io_netcdf import read_netcdf, read_netcdf_xr
+from hycom.io import read_hycom_fields
 from ai_common.constants.AI_params import TrainingParams,AiModels, ModelParams
-from img_viz.eoa_viz import EOAImageVisualizer
+# from img_viz.eoa_viz import EOAImageVisualizer
 # From project
 from io_project.read_utils import generateXandY2D, generateXandYMulti, get_date_from_preproc_filename
 from constants_proj.AI_proj_params import ProjTrainingParams, PreprocParams

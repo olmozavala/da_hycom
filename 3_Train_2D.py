@@ -7,11 +7,16 @@ from config.PreprocConfig import get_preproc_config
 from ai_common.models.modelSelector import select_2d_model
 from ai_common.constants.AI_params import TrainingParams, ModelParams
 import ai_common.training.trainingutils as utilsNN
+# Submodules
+import sys
+sys.path.append("eoas_pyutils/")
+from io_utils.io_common import create_folder
 # This project
 from AI.data_generation.GeneratorRaw2D import data_gen_from_raw
 from constants_proj.AI_proj_params import ProjTrainingParams, ParallelParams, NetworkTypes, PreprocParams
 from models_proj.models import *
-from img_viz.common import create_folder
+from io_utils.io_netcdf import read_netcdf, read_netcdf_xr
+from hycom.io import read_hycom_fields
 
 from os.path import join
 import numpy as np
