@@ -145,6 +145,7 @@ def normalizeData(data, field_name, data_type = PreprocParams.type_model, norm_t
                 # return output_data.filled(np.nan)
                 return output_data.data
         except Exception as e:
+            print("Error from the normalization code")
             return data
 
 # if norm_type == PreprocParams.mean_var:

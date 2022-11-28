@@ -4,19 +4,19 @@ from eoas_pyutils.viz_utils.constants import PlotMode
 import numpy as np
 
 # ----------------------------- UM -----------------------------------
-_output_folder = '/data/HYCOM/DA_HYCOM_TSIS/'  # Where to save everything
+_output_folder = '/data/HYCOM/DA_HYCOM_TSIS/'  # ONLY FOR PREPROC check MainConfig2D.py for training
 
 def get_preproc_config():
     model_config = {
         # PreprocParams.input_folder_hycom: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies',
-        # PreprocParams.input_folder_hycom: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.0/data',
-        PreprocParams.input_folder_hycom: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/data',
-        # PreprocParams.input_folder_hycom: '/data/HYCOM/DA_HYCOM_TSIS/RAW_2021/HYCOM',
+        PreprocParams.input_folder_hycom: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.0/data',
+        # PreprocParams.input_folder_hycom: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/data',
+        PreprocParams.input_folder_hycom: '/nexsan/archive/dvoss/TSIS/GOMb0.04/expt_02.2/data',
 
         # PreprocParams.input_folder_tsis: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies/incup/',
         # PreprocParams.input_folder_tsis: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.0/incup',
-        PreprocParams.input_folder_tsis: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/incup',
-        # PreprocParams.input_folder_tsis: '/data/HYCOM/DA_HYCOM_TSIS/RAW_2021/TSIS',
+        # PreprocParams.input_folder_tsis: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/incup',
+        PreprocParams.input_folder_tsis: '/nexsan/archive/dvoss/TSIS/GOMb0.04/expt_02.2/incup',
 
         # PreprocParams.input_folder_obs: '/data/COAPS_nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES',
         PreprocParams.input_folder_obs: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/obs/qcobs_roif',

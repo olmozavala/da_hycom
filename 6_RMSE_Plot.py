@@ -47,8 +47,10 @@ def makeScatter(c_summary, group_field, xlabel, output_file, title_txt="", units
     # plt.show()
     plt.close()
 
-imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/Prediction2002_2006/imgs"
-summary_folder = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/"
+# imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/Prediction2002_2006/imgs"
+# summary_folder = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/"
+imgs_prediction_folder = "/home/olmozavala/DAN_HYCOM/OUTPUT/Prediction2002_2006/imgs/"
+summary_folder = "/home/olmozavala/DAN_HYCOM/OUTPUT/SUMMARY/"
 
 all_folders = [ name for name in os.listdir(imgs_prediction_folder) if os.path.isdir(os.path.join(imgs_prediction_folder, name)) ]
 all_folders.sort()

@@ -203,7 +203,8 @@ def get_defaults():
     perc_ocean = [0]
     network_types = [NetworkTypes.UNET]
     network_names = ["2DUNET"]
-    obs_in_fields = [["ssh"]]
+    obs_in_fields = [["ssh","ssh_err"]]
+    # obs_in_fields = [["ssh"]]
     in_fields = [['srfhgt']]
     output_fields = [["srfhgt"]]
     comp_fields = [["diff_ssh","topo"]]
@@ -220,48 +221,46 @@ if __name__ == '__main__':
     # # ====================================================================
     orig_name = orig_config[TrainingParams.config_name]
 
-    start_i = 4  # When to start (if we already have some runs)
-    N = 1  # How many networks we want to run for each experiment
+    start_i = 1  # When to start (if we already have some runs)
+    N = 5  # How many networks we want to run for each experiment
 
     # ========== NN With best results =================
-    # print(" --------------- Multiple runs of best network -------------------")
+    print(" --------------- Multiple runs of best network -------------------")
+    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+    output_fields = [['srfhgt']]
+    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+
+    # # ========== Testing Types of NN options =================
+    # print(" --------------- Testing different NN selections -------------------")
+    # bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+    # network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
+    # network_names = ["2DUNET", "SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
+    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    #
+    # # ========== Testing obs input fields =================
+    # print(" --------------- Testing different input OBS types -------------------")
+    # bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+    # obs_in_fields = [["ssh", "sst"], ["ssh", "ssh_err", "sst", "sst_err"]]
+    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    #
+    # # ========== Testing output fields =================
+    # print(" --------------- Testing different output fields -------------------")
+    # bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+    # output_fields = [["temp"],["srfhgt","temp"]]
+    # obs_in_fields = [["ssh", "sst"]]
+    # in_fields = [["srfhgt","temp"]]
+    # comp_fields = [["diff_ssh","topo","diff_sst"]]
+    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    #
+    # # ========== Testing BBOX options =================
+    # print(" --------------- Testing different bbox selections -------------------")
+    # bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+    # bboxes = [[80,80], [120, 120], [160,160]]
+    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    #
+    # # ========== Testing perc of oceans =================
+    # print(" --------------- Testing different Perc ocean -------------------")
     # bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
     # bboxes = [[160,160]]
     # perc_ocean = [.3, .6, .9]
-    # output_fields = [['srfhgt'], ['srfhgt', 'temp']]
-    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, obs_in_fields, output_fields, comp_fields)
-
-    # ========== Testing Types of NN options =================
-    print(" --------------- Testing different NN selections -------------------")
-    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
-    network_names = ["2DUNET", "SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
-    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
-
-    # ========== Testing obs input fields =================
-    print(" --------------- Testing different input OBS types -------------------")
-    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    obs_in_fields = [["ssh", "sst"], ["ssh", "ssh_err", "sst", "sst_err"]]
-    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
-
-    # ========== Testing output fields =================
-    print(" --------------- Testing different output fields -------------------")
-    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    output_fields = [["temp"],["srfhgt","temp"]]
-    obs_in_fields = [["ssh", "sst"]]
-    in_fields = [["srfhgt","temp"]]
-    comp_fields = [["diff_ssh","topo","diff_sst"]]
-    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
-
-    # ========== Testing BBOX options =================
-    print(" --------------- Testing different bbox selections -------------------")
-    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    bboxes = [[80,80], [120, 120], [160,160]]
-    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
-
-    # ========== Testing perc of oceans =================
-    print(" --------------- Testing different Perc ocean -------------------")
-    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    bboxes = [[160,160]]
-    perc_ocean = [.3, .6, .9]
-    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)

@@ -8,7 +8,10 @@ import pandas as pd
 from config.MainConfig_2D import get_training
 from ai_common.constants.AI_params import TrainingParams, ModelParams
 from constants_proj.AI_proj_params import ProjTrainingParams
-from img_viz.common import create_folder
+
+import sys
+sys.path.append("eoas_pyutils/")
+from io_utils.io_common import create_folder
 
 from ExtraUtils.NamesManipulation import *
 

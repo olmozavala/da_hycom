@@ -6,10 +6,10 @@ import os, sys
 # Common
 sys.path.append("eoas_pyutils/")
 sys.path.append("hycom_utils/python")
+from viz_utils.eoa_viz import EOAImageVisualizer
 from io_utils.io_netcdf import read_netcdf, read_netcdf_xr
 from hycom.io import read_hycom_fields
 from ai_common.constants.AI_params import TrainingParams,AiModels, ModelParams
-# from img_viz.eoa_viz import EOAImageVisualizer
 # From project
 from io_project.read_utils import generateXandY2D, generateXandYMulti, get_date_from_preproc_filename
 from constants_proj.AI_proj_params import ProjTrainingParams, PreprocParams
@@ -48,9 +48,12 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
         c_datetime = datetime.strptime(sp_name, "%Y_%j_18")
         c_datetime_next_day = c_datetime + timedelta(days=1)
 
-        background_files.append(join(input_folder_background, F"022_archv.{c_datetime.strftime('%Y_%j')}_18.a"))
+        background_files.append(join(input_folder_background, F"022_archv.{c_datetime.strftime('%Y_%j')}_18.a")) # For 2002 and 2006
+        # background_files.append(join(input_folder_background, F"020_archv.{c_datetime.strftime('%Y_%j')}_18.a")) # For 2009 and 2010
         obs_files.append(join(input_folder_observations, F"tsis_obs_gomb4_{c_datetime_next_day.strftime('%Y%m%d')}00.nc"))
+        # print(background_files[f_idx])
         assert os.path.exists(background_files[f_idx])
+        # print(obs_files[f_idx])
         assert os.path.exists(obs_files[f_idx])
 
     background_files = np.array(background_files)
@@ -118,35 +121,32 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
                 X = np.expand_dims(input_data, axis=0)
                 Y = np.expand_dims(y_data, axis=0)
                 # --------------- Just for debugging Plotting input and output---------------------------
-                # import matplotlib.pyplot as plt
-                # from scipy.ndimage import convolve, gaussian_filter
-                # import cmocean
-                # from eoas_utils.VizUtilsProj import chooseCMAP
-                # # mincbar = np.nanmin(input_data)
-                # # maxcbar = np.nanmax(input_data)
-                # output_folder = config[TrainingParams.output_folder]
-                # # Replace nan to 0
-                # X[0,:,:,2] = np.nan_to_num(X[0,:,:,2], 0 )
-                # X[0,:,:,3] = np.nan_to_num(X[0,:,:,3], 0 )
-                # # Apply gaussian filter
-                # # X[0,:,:,2] = gaussian_filter(X[0,:,:,2], 2)
-                # # X[0,:,:,3] = gaussian_filter(X[0,:,:,3], 2)
-                #
-                # viz_obj = EOAImageVisualizer(output_folder=join(output_folder, "training_imgs"), disp_images=False)
-                # viz_obj.plot_2d_data_np(np.rollaxis(X[0,:,:,:],2,0),
-                #                             var_names=[F"in_model_{x}" for x in field_names+composite_field_names] +
-                #                                       [F"in_obs_{x}" for x in obs_field_names],
-                #                             flip_data=True,
-                #                             cmap=[cmocean.cm.thermal, cmocean.cm.curl,cmocean.cm.curl,cmocean.cm.thermal,cmocean.cm.curl],
-                #                             # cmap=cmocean.cm.curl,
-                #                             file_name_prefix=F"{c_id}_{start_col}_{start_row}",
-                #                             title=F"")
-                #
-                # viz_obj.plot_2d_data_np(np.rollaxis(Y[0,:,:,:],2,0),
-                #                         var_names=[F"out_model_{x}" for x in output_fields] ,
-                #                         flip_data=True,
-                #                         file_name_prefix=F"{c_id}_{start_col}_{start_row}_out",
-                #                         title=F"")
+                import matplotlib.pyplot as plt
+                from scipy.ndimage import convolve, gaussian_filter
+                import cmocean
+                # mincbar = np.nanmin(input_data)
+                # maxcbar = np.nanmax(input_data)
+                output_folder = config[TrainingParams.output_folder]
+                # Replace nan to 0
+                X[0,:,:,2] = np.nan_to_num(X[0,:,:,2], 0 )
+                X[0,:,:,3] = np.nan_to_num(X[0,:,:,3], 0 )
+                # Apply gaussian filter
+                # X[0,:,:,2] = gaussian_filter(X[0,:,:,2], 2)
+                # X[0,:,:,3] = gaussian_filter(X[0,:,:,3], 2)
+
+                viz_obj = EOAImageVisualizer(output_folder=join(output_folder, "training_imgs"), disp_images=False)
+                viz_obj.plot_2d_data_np(np.rollaxis(X[0,:,:,:],2,0),
+                                            var_names=[F"in_model_{x}" for x in field_names+composite_field_names] +
+                                                      [F"in_obs_{x}" for x in obs_field_names],
+                                            cmap=[cmocean.cm.thermal, cmocean.cm.curl,cmocean.cm.curl,cmocean.cm.thermal,cmocean.cm.curl],
+                                            # cmap=cmocean.cm.curl,
+                                            file_name_prefix=F"{c_id}_{start_col}_{start_row}",
+                                            title=F"")
+
+                viz_obj.plot_2d_data_np(np.rollaxis(Y[0,:,:,:],2,0),
+                                        var_names=[F"out_model_{x}" for x in output_fields] ,
+                                        file_name_prefix=F"{c_id}_{start_col}_{start_row}_out",
+                                        title=F"{increment_file_name}")
 
                 yield X, Y
                 # yield [np.zeros((1, 384, 520, 24, 8))], [np.zeros((1, 384, 520, 24, 6))]

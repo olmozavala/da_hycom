@@ -13,7 +13,6 @@ from os.path import join
 import numpy as np
 import pandas as pd
 import time
-import cmocean
 
 from config.MainConfig_2D import get_prediction_params
 from constants_proj.AI_proj_params import PredictionParams, ProjTrainingParams, PreprocParams
@@ -41,12 +40,12 @@ def main():
 
     # -------- For all summary model testing --------------
     print("Testing all the models inside summary.csv ....")
-    summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
+    # summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
+    summary_file = "/home/olmozavala/DAN_HYCOM/OUTPUT/SUMMARY/summary.csv"
     df = pd.read_csv(summary_file)
 
     for model_id in range(len(df)):
-        # model = df.iloc[model_id]
-        model = df.iloc[19]
+        model = df.iloc[model_id]
         # Setting Network type (only when network type is UNET)
         name = model["Name"]
         print(F"Model id: {model_id}, name: {name}")
@@ -107,7 +106,7 @@ def test_model(config):
     preproc_config = get_preproc_config()
 
     input_folder_background = preproc_config[PreprocParams.input_folder_hycom]
-    input_folder_increment =  preproc_config[PreprocParams.input_folder_tsis]
+    input_folder_increment = preproc_config[PreprocParams.input_folder_tsis]
     input_folder_observations = preproc_config[PreprocParams.input_folder_obs]
 
     output_imgs_folder = join(output_imgs_folder, run_name)
@@ -192,7 +191,9 @@ def test_model(config):
     # All files
     # for id_file, c_file in enumerate(increment_files):
     # Testing 2002 and 2006
-    test_files = [x for x in increment_files if x.find("2002") != -1 or x.find("2006") != -1]
+    # test_files = [x for x in increment_files if x.find("2002") != -1 or x.find("2006") != -1]
+    # Testing 2009 and 2010
+    test_files = [x for x in increment_files if x.find("2009") != -1 or x.find("2010") != -1]
     successful_files = []
     for id_file, c_file in enumerate(test_files):
         # Find current and next date
@@ -204,6 +205,7 @@ def test_model(config):
         print(F"=================== Day of year {c_day_str}_{day_of_year} ==========================")
 
         model_file_name = join(input_folder_background, F"022_archv.{c_datetime.strftime('%Y_%j')}_18.a")
+        # model_file_name = join(input_folder_background, F"020_archv.{c_datetime.strftime('%Y_%j')}_18.a")
         increment_file_name = c_file
         obs_file_name = join(input_folder_observations, F"tsis_obs_gomb4_{c_datetime_next_day.strftime('%Y%m%d')}00.nc")
 
@@ -253,8 +255,15 @@ def test_model(config):
                 Y = np.expand_dims(y_data[s_row:s_row+rows, s_col:s_col+cols,:], axis=0)
 
                 #=====================  Make the prediction of the network =======================
+                #=====================  Here  =======================
+                new_x = np.zeros((30, 384, 520, 5))
+                for i in range(30):
+                    new_x[i,:,:,:] = X
+                # output_nn_original = model.predict(X, verbose=1)
                 start = time.time()
-                output_nn_original = model.predict(X, verbose=1)
+                output_nn_original_multiple = model.predict(new_x, verbose=1)
+                output_nn_original = output_nn_original_multiple[1,:,:,:]
+                output_nn_original = np.reshape(output_nn_original, (1, 384, 520, 1))
                 toc = time.time() - start
                 this_file_times.append(toc)
 
@@ -300,33 +309,33 @@ def test_model(config):
             # ------------------ Smoothing fields for visualization -------------
             obs_ssh_idx = len(field_names) + len(comp_field_names)
             ssh_diff_idx = len(field_names)
-            model_ssh_idx = 1 # TODO review this is the SSH index for th emodel
+            model_ssh_idx = 0 # TODO review this is the SSH index for the model
 
-            # # Smooths SSH (Assumes the first obs field is always SSH)
-            # temp_field = denorm_input[:,:,obs_ssh_idx]  # Selects SSH
-            # temp_field = np.nan_to_num(temp_field, 0)
-            # temp_field = gaussian_filter(temp_field, 1)
-            # temp_field[np.logical_and(temp_field >= -eps, temp_field <= eps)] = np.nan
-            # denorm_input[:,:,obs_ssh_idx] = temp_field
-            #
-            # # # Smooths DIFF_SSH (assumes it is the first composite field)
-            # temp_field = denorm_input[:,:,ssh_diff_idx] # Reads the "DIFF" field
-            # temp_field = np.nan_to_num(temp_field, 0)
-            # temp_field = gaussian_filter(temp_field, 1)
-            # # temp_field[temp_field == 0] = np.nan
-            # temp_field[np.logical_and(temp_field >= -eps, temp_field <= eps)] = np.nan
-            # temp2 = denorm_y[:, :, model_ssh_idx].copy()
-            # temp_idxs = np.logical_not(np.isnan(temp_field))
-            # temp2[temp_idxs] = temp_field[temp_idxs]
-            # # denorm_input[:,:,ssh_diff_idx] = temp2 # Reassigned the input diff
-            # denorm_input[:,:,ssh_diff_idx] = temp_field# Only smoothed diff
-            #
-            # # Smooths Observations
-            # temp_field = denorm_input[:,:,len(field_names) + 1] # Reads the "DIFF" field
-            # temp_field = np.nan_to_num(temp_field, 0)
-            # temp_field = convolve(temp_field, filter)  # Here is the convolution (extension of values)
+            # Smooths SSH (Assumes the first obs field is always SSH)
+            temp_field = denorm_input[:,:,obs_ssh_idx]  # Selects SSH
+            temp_field = np.nan_to_num(temp_field, 0)
+            temp_field = gaussian_filter(temp_field, 1)
+            temp_field[np.logical_and(temp_field >= -eps, temp_field <= eps)] = np.nan
+            denorm_input[:,:,obs_ssh_idx] = temp_field
+
+            # # Smooths DIFF_SSH (assumes it is the first composite field)
+            temp_field = denorm_input[:,:,ssh_diff_idx] # Reads the "DIFF" field
+            temp_field = np.nan_to_num(temp_field, 0)
+            temp_field = gaussian_filter(temp_field, 1)
             # temp_field[temp_field == 0] = np.nan
-            # denorm_input[:,:,len(field_names) + 1] = temp_field  # Reassigned
+            temp_field[np.logical_and(temp_field >= -eps, temp_field <= eps)] = np.nan
+            temp2 = denorm_y[:, :, model_ssh_idx].copy()
+            temp_idxs = np.logical_not(np.isnan(temp_field))
+            temp2[temp_idxs] = temp_field[temp_idxs]
+            # denorm_input[:,:,ssh_diff_idx] = temp2 # Reassigned the input diff
+            denorm_input[:,:,ssh_diff_idx] = temp_field# Only smoothed diff
+
+            # Smooths Observations
+            temp_field = denorm_input[:,:,len(field_names) + 1] # Reads the "DIFF" field
+            temp_field = np.nan_to_num(temp_field, 0)
+            temp_field = convolve(temp_field, filter)  # Here is the convolution (extension of values)
+            temp_field[temp_field == 0] = np.nan
+            denorm_input[:,:,len(field_names) + 1] = temp_field  # Reassigned
 
             rmse_txts =[F"{rmse_cnn[i]:0.4f}" for i,x in enumerate(output_fields)]
 
@@ -418,8 +427,8 @@ def getMinMaxCbar(fields):
             maxcbar.append(2.)
             mincbar.append(-2.)
         elif c_field == "diff_ssh":
-            maxcbar.append(0.4)
-            mincbar.append(-0.4)
+            maxcbar.append(0.1)
+            mincbar.append(-0.1)
         elif c_field == "salin" or c_field == "sss" or c_field == "sal":
             maxcbar.append(np.nan)
             mincbar.append(np.nan)
