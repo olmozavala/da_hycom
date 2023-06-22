@@ -1,10 +1,12 @@
 from info.info_hycom import read_field_names
+from datetime import datetime
 from hycom.io import read_hycom_fields, read_field_names, read_hycom_coords
 from inout.io_netcdf import read_netcdf
 from img_viz.eoa_viz import EOAImageVisualizer
 from img_viz.constants import PlotMode
 from preproc.UtilsDates import get_days_from_month
 from preproc.metrics import mse
+import pandas as pd
 from io_project.read_utils import *
 import xarray as xr
 import re
@@ -21,7 +23,7 @@ _minlon = -98.08
 _maxlat = 31.9267
 _maxlon = -56.08
 
-# Here we identify lat and lons before hand. TODO improve this making it local to functions
+# # Here we identify lat and lons before hand. TODO improve this making it local to functions
 coords_file = "/data/HYCOM/DA_HYCOM_TSIS/preproc/coords/regional.grid.a"
 # coord_fields = [ 'plon','plat','qlon','qlat','ulon','ulat','vlon','vlat']
 coord_fields = ['plon','plat']
@@ -193,6 +195,7 @@ def proc_model_data(np_fields, field_names, file_name):
 
     preproc_model_ds = addLatLon(preproc_model_ds, lats, lons, rows, cols)
     preproc_model_ds.to_netcdf(file_name)
+
 
 if __name__ == '__main__':
     # ----------- Parallel -------

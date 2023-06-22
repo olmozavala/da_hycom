@@ -8,7 +8,7 @@ SRC_PATH='/home/olmozavala/Dropbox/MyProjects/OZ_LIB/AI_Template'
 MAIN_CONFIG="${SRC_PATH}/config"
 
 #echo '############################ Copying configuration file ############################ '
-#cp Config_Tests.py $MAIN_CONFIG/MainConfig.py
+#cp Config_Tests.py $MAIN_CONFIG/MainConfig_2D.py
 
 
 echo '############################ Training ############################ '

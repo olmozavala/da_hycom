@@ -1,6 +1,7 @@
 from info.info_hycom import read_field_names
-from inout.io_hycom import read_hycom_fields
-from inout.io_netcdf import read_netcdf
+import cmocean
+from inout.io_hycom import read_hycom_fields, sub_var2
+from inout.io_netcdf import read_netcdf, read_netcdf_xr
 from img_viz.eoa_viz import EOAImageVisualizer
 from img_viz.constants import PlotMode
 from preproc.UtilsDates import get_days_from_month
@@ -13,6 +14,7 @@ from constants_proj.AI_proj_params import PreprocParams, ParallelParams
 from config.PreprocConfig import get_preproc_config
 from preproc.UtilsDates import get_day_of_year_from_month_and_day
 from sklearn.metrics import mean_squared_error
+from scipy.ndimage import convolve, gaussian_filter
 import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 import xarray as xr
@@ -22,19 +24,6 @@ import cartopy.feature as cfeature
 import cartopy
 
 NUM_PROC = 1
-
-def main():
-    # ----------- Parallel -------
-    # p = Pool(NUM_PROC)
-    # compute_consecutive_days_difference()
-    # p.map(plot_raw_data_new, range(NUM_PROC))
-    # p.map(img_generation_hycom, range(NUM_PROC))
-    # img_generation_all(1)  # Single proc generation
-    plot_raw_data_new(0)
-
-    # ----------- Sequencial -------
-    # img_generation_all(1)
-    # testing()
 
 def plot_raw_data_new(proc_id):
     """
@@ -62,24 +51,35 @@ def plot_raw_data_new(proc_id):
         # Iterate current month
         for c_month in MONTHS:
             try:
-                days_of_month, days_of_year = get_days_from_month(c_month)
+                days_of_month, day_of_year_this_month = get_days_from_month(c_month)
                 # Reads the data (DA, Free run, and observations)
                 increment_files, increment_paths = get_hycom_file_name(input_folder_tsis, c_year, c_month)
                 hycom_files, hycom_paths = get_hycom_file_name(input_folder_forecast, c_year, c_month, day_idx=2)
+                # OLD format
+                # hycom_files, hycom_paths = get_hycom_file_name(input_folder_forecast, c_year, c_month, day_idx=1)
                 obs_files, obs_paths = get_obs_file_names(input_folder_obs, c_year, c_month)
             except Exception as e:
-                print(F"Failed to find any file for date {c_year}-{c_month}")
+                print(F"Failed to find any file for date {c_year}-{c_month}: {e}")
                 continue
 
             # This for is fixed to be able to run in parallel
-            for c_day_of_month, c_day_of_year in enumerate(days_of_year):
+            for c_day_of_month, c_day_of_year in enumerate(day_of_year_this_month):
+                if c_day_of_year <= 317:
+                    continue
                 if (c_day_of_month % NUM_PROC) == proc_id:
                     # Makes regular expression of the current desired file
                     re_tsis = F'incupd.{c_year}_{c_day_of_year:03d}\S*.a'
-                    re_hycom = F'020_archv.{c_year}_{c_day_of_year:03d}\S*.a'
+                    re_hycom = F'\S*_archv.{c_year}_{c_day_of_year:03d}\S*.a'
+                    # Old format
                     # re_hycom = F'archv.{c_year}_{c_day_of_year:03d}\S*.a'
                     # re_obs = F'tsis_obs_ias_{c_year}{c_month:02d}{c_day_of_month+1:02d}\S*.nc'
-                    re_obs = F'tsis_obs_gomb4_{c_year}{c_month:02d}{c_day_of_month+1:02d}\S*.nc'
+                    try: # Super patch to get the file for the next day
+                        re_obs = F'tsis_obs_gomb4_{c_year}{c_month:02d}{c_day_of_month+2:02d}\S*.nc'
+                    except Exception as e:
+                        if c_month < 12:
+                            re_obs = F'tsis_obs_gomb4_{c_year}{c_month+1:02d}{1:02d}\S*.nc'
+                        else:
+                            re_obs = F'tsis_obs_gomb4_{c_year+1}{1:02d}{1:02d}\S*.nc'
 
                     try:
                         # Gets the proper index of the file for the three cases
@@ -99,8 +99,16 @@ def plot_raw_data_new(proc_id):
                     model_state_np_fields = read_hycom_fields(hycom_paths[hycom_file_idx], fields, layers=layers)
                     increment_np_fields = read_hycom_fields(increment_paths[increment_file_idx], fields, layers=layers)
 
+                    first_field = model_state_np_fields[fields[0]]
+                    idm4 = first_field.shape[2]
+                    jdm4 = first_field.shape[1]
+
+                    grid_file = "/data/HYCOM/DA_HYCOM_TSIS/Topography/regional.grid.a"
+                    dx4 = sub_var2(grid_file,idm4,jdm4,10)  #  dx in meters
+                    dy4 = sub_var2(grid_file,idm4,jdm4,11)
+
                     # obs_np_fields = read_netcdf(obs_paths[obs_file_idx], fields_obs, rename_fields=fields)
-                    obs_np_fields = read_netcdf(obs_paths[obs_file_idx], fields_obs)
+                    obs_np_fields = read_netcdf_xr(obs_paths[obs_file_idx], fields_obs)
 
                     # Iterate over the fields defined in PreprocConfig and plot them
                     for idx_field, c_field_name in enumerate(fields):
@@ -119,35 +127,108 @@ def plot_raw_data_new(proc_id):
                         # mse_obs_vs_hycom = mse(obs_np_c_field, model_state_np_c_field[0])
                         # mse_obs_vs_da = mse(obs_np_c_field, increment_np_c_field[0])
 
+                        maxcbar = np.nan
+                        mincbar = np.nan
+
+                        # Correcting fields (changing units)
                         if c_field_name == "thknss":
                             divide = 9806
                             model_state_np_c_field = model_state_np_c_field/divide
                             increment_np_c_field = increment_np_c_field/divide
+                        elif c_field_name == "temp":
+                            # mincbar =  -.05
+                            # maxcbar =  .05
+                            mincbar =  np.nan
+                            maxcbar =  np.nan
+                        elif (c_field_name == "u-vel") or (c_field_name == "v-vel"):
+                            mincbar = -.02
+                            maxcbar = .02
+                        elif c_field_name == "salin":
+                            mincbar = -0.01
+                            maxcbar = 0.01
                         if c_field_name == "srfhgt":
-                            inc = increment_np_c_field
-                        else:
-                            inc = (model_state_np_c_field - increment_np_c_field)
+                            model_state_np_c_field = model_state_np_c_field/9.806
+                            mincbar = -0.20
+                            maxcbar = 0.20
+
+                        # Computing the increment
+                        inc = (increment_np_c_field - model_state_np_c_field)
 
                         # ======================= Only Background state and TSIS increment ==================
-                        try:
-                            title = F"{c_field_name} {c_year}_{c_month:02d}_{(c_day_of_month+1):02d}"
-                            img_viz.plot_3d_data_np([model_state_np_c_field, inc],
-                            # img_viz.plot_3d_data_np([model_state_np_c_field, increment_np_c_field],
-                                                    var_names=['HYCOM', 'Increment (TSIS)'],
-                                                    title=title, file_name_prefix=F'ModelAndIncrement_{c_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
-                                                    flip_data=True, plot_mode=plot_modes[idx_field])
-                        except Exception as e:
-                            print(F"Failed for field: {c_field_name}: {e}")
+                        # try:
+                        #     title = F"{c_field_name} {c_year}_{c_month:02d}_{(c_day_of_month+1):02d}"
+                        #     img_viz.plot_3d_data_np([model_state_np_c_field, inc],
+                        #     # img_viz.plot_3d_data_np([model_state_np_c_field, increment_np_c_field],
+                        #                             var_names=['HYCOM', 'Increment (TSIS)'],
+                        #                             title=title, file_name_prefix=F'ModelAndIncrement_{c_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
+                        #                             flip_data=True, plot_mode=plot_modes[idx_field], maxcbar=maxcbar, mincbar=mincbar)
+                        # except Exception as e:
+                        #     print(F"Failed for field: {c_field_name}: {e}")
 
-                        # # ======================= Only HYCOM, TSIS, Observations ==================
-                        # c_obs_field_name = fields_obs[idx_field]
-                        # # title = F"{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}"
-                        # title = F"{(c_day_of_month+1):02d}"
-                        # obs_np_c_field = obs_np_fields[c_obs_field_name]
-                        # # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, inc],
-                        # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, np.expand_dims(obs_np_c_field, 0) - model_state_np_c_field, inc],
+                        # # ======================= Only OBS, HYCOM, OBS-HYCOM, INC,  ==================
+                        c_obs_field_name = fields_obs[idx_field]
+                        # title = F"{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}"
+                        title = F"{(c_day_of_month+1):02d}"
+                        obs_np_c_field = obs_np_fields[c_obs_field_name]
+
+                        # Put the observations in the same range than the background (remove bias)
+                        if c_field_name == "srfhgt":
+                            # ---------- Manual version --------------
+                            # mask4=np.zeros([jdm4,idm4]l
+                            # mask4[np.logical_not(np.isnan(model_state_np_c_field[0,:,:]))] = 1.
+                            # ssh_mean=np.nansum(model_state_np_c_field[0,:,:]*dx4*dy4)/np.nansum(dx4*dy4*mask4)
+                            # model_state_np_c_field =(model_state_np_c_field-ssh_mean)/9.806
+                            # ---------- Remove bias tisis version --------------
+                            # data_loc = np.logical_and(np.logical_not(np.isnan(model_state_np_c_field[0,:,:])),
+                            #                           np.logical_not(np.isnan(obs_np_c_field)))
+                            ssh_bias = np.mean(model_state_np_c_field[0,:,:] - obs_np_c_field)
+                            obs_np_c_field += ssh_bias
+
+                        # model_state_np_c_field =model_state_np_c_field/9.806
+                        # Computes the difference between the BACK - OBS
+                        diff = obs_np_c_field - model_state_np_c_field[0,:,:]
+
+                        if c_obs_field_name == "ssh":
+                            size = 3
+                            filter = 1/(2**2) * np.ones((size,size))
+                            # Smooths obs
+                            obs_np_c_field = np.nan_to_num(obs_np_c_field, 0)
+                            # obs_np_c_field= convolve(obs_np_c_field, filter)
+                            obs_np_c_field = gaussian_filter(obs_np_c_field, 1)
+                            obs_np_c_field[obs_np_c_field== 0] = np.nan
+                            # Smooths difference
+                            diff= np.nan_to_num(diff, 0)
+                            diff = gaussian_filter(diff , 1)
+                            eps = .005
+                            diff[np.logical_and(diff >= -eps, diff <= eps)] = np.nan
+
+                        # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, inc],
+                        # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, np.expand_dims(diff,0), inc],
                         #                         var_names=[F'Obs', 'HYCOM', 'OBS-HYCOM', 'INC'],
                         #                         title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
+                        #                         flip_data=True, plot_mode=plot_modes[idx_field])
+
+
+                        # Just for testing. Adds the difference into the increment
+                        if c_obs_field_name == "ssh":
+                            t = np.expand_dims(diff,0).copy()
+                            t[np.isnan(t)] = inc[np.isnan(t)]
+                        else:
+                            t = np.expand_dims(diff,0) + model_state_np_c_field
+
+                        img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, np.expand_dims(diff,0), inc, t],
+                                                var_names=[F'Obs', 'HYCOM', 'OBS-HYCOM', 'INC', "INC + DIFF"],
+                                                title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
+                                                cmap=cmocean.cm.curl,
+                                                maxcbar=[maxcbar, maxcbar, maxcbar, maxcbar, maxcbar],
+                                                mincbar=[mincbar, mincbar, mincbar, mincbar, mincbar],
+                                                flip_data=True, plot_mode=plot_modes[idx_field])
+                        # img_viz.plot_3d_data_np([inc, t],
+                        #                         var_names=['INC', "INC + DIFF"],
+                        #                         title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
+                        #                         cmap=cmocean.cm.curl,
+                        #                         maxcbar=[maxcbar for x in range(2)],
+                        #                         mincbar=[mincbar for x in range(2)],
                         #                         flip_data=True, plot_mode=plot_modes[idx_field])
 
 def plot_raw_data(proc_id):
@@ -175,7 +256,7 @@ def plot_raw_data(proc_id):
         # Iterate current month
         for c_month in MONTHS:
             try:
-                days_of_month, days_of_year = get_days_from_month(c_month)
+                days_of_month, day_of_year_this_month = get_days_from_month(c_month)
                 # Reads the data (DA, Free run, and observations)
                 increment_files, increment_paths = get_hycom_file_name(input_folder_tsis, c_year, c_month)
                 hycom_files, hycom_paths = get_hycom_file_name(input_folder_forecast, c_year, c_month)
@@ -185,7 +266,7 @@ def plot_raw_data(proc_id):
                 continue
 
             # This for is fixed to be able to run in parallel
-            for c_day_of_month, c_day_of_year in enumerate(days_of_year):
+            for c_day_of_month, c_day_of_year in enumerate(day_of_year_this_month):
                 if (c_day_of_month % NUM_PROC) == proc_id:
                     # Makes regular expression of the current desired file
                     re_tsis = F'incupd.{c_year}_{c_day_of_year:03d}\S*.a'
@@ -225,7 +306,8 @@ def plot_raw_data(proc_id):
                         # mse_obs_vs_da = mse(obs_np_c_field, increment_np_c_field[0])
 
                         title = F"{c_field_name} {c_year}_{c_month:02d}_{(c_day_of_month+1):02d}"
-                        # ======================= Only Fredatae HYCOM, TSIS, Observations ==================
+
+                        # ======================= Only Free HYCOM, TSIS, Observations ==================
                         img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, increment_np_c_field],
                                                 var_names=[F'Observations', 'HYCOM', 'Increment (TSIS)'],
                                                 title=title, file_name_prefix=F'Summary_{c_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
@@ -269,7 +351,7 @@ def compute_consecutive_days_difference():
         for c_month in MONTHS:
             # Reading the data
             try:
-                days_of_month, days_of_year = get_days_from_month(c_month)
+                days_of_month, day_of_year_this_month = get_days_from_month(c_month)
                 # Reading hycom files
                 hycom_files, hycom_paths = get_hycom_file_name(input_folder_forecast, c_year, c_month)
             except Exception as e:
@@ -277,7 +359,7 @@ def compute_consecutive_days_difference():
                 continue
 
             # This for is fixed to be able to run in parallel
-            for c_day_of_month, c_day_of_year in enumerate(days_of_year):
+            for c_day_of_month, c_day_of_year in enumerate(day_of_year_this_month):
                 print(F"---------- Year {c_year} day: {c_day_of_year} --------------")
                 # Makes regular expression of the current desired file
                 re_hycom = F'archv.{c_year}_{c_day_of_year:03d}\S*.a'
@@ -335,7 +417,7 @@ def img_generation_hycom(proc_id):
         # Iterate current month
         for c_month in MONTHS:
             try:
-                days_of_month, days_of_year = get_days_from_month(c_month)
+                days_of_month, day_of_year_this_month = get_days_from_month(c_month)
                 # Reads the data (DA, Free run, and observations)
                 hycom_files, hycom_paths = get_hycom_file_name(input_folder_forecast, c_year, c_month)
             except Exception as e:
@@ -343,7 +425,7 @@ def img_generation_hycom(proc_id):
                 continue
 
             # This for is fixed to be able to run in parallel
-            for c_day_of_month, c_day_of_year in enumerate(days_of_year):
+            for c_day_of_month, c_day_of_year in enumerate(day_of_year_this_month[0:3]):
                 if (c_day_of_month % NUM_PROC) == proc_id:
                     # Makes regular expression of the current desired file
                     re_hycom = F'archv.{c_year}_{c_day_of_year:03d}\S*.a'
@@ -518,7 +600,17 @@ def plotPunctualDataFromObs(ds, title):
     #     plt.show()
 
 if __name__ == '__main__':
-    main()
+    # ----------- Parallel -------
+    # p = Pool(NUM_PROC)
+    # compute_consecutive_days_difference()
+    # p.map(plot_raw_data_new, range(NUM_PROC))
+    # p.map(img_generation_hycom, range(NUM_PROC))
+    # img_generation_all(1)  # Single proc generation
+    plot_raw_data_new(0)
+
+    # ----------- Sequencial -------
+    # img_generation_all(1)
+    # testing()
     # visualizeBackgroundIncrementAnalaysis()
     # print("Done!")
     #

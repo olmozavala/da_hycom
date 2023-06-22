@@ -1,6 +1,6 @@
 import numpy as np
 from inout.io_netcdf import read_netcdf
-from io_project.read_utils import generateXandY, generateXandYMulti, get_date_from_preproc_filename
+from io_project.read_utils import generateXandY2D, generateXandYMulti, get_date_from_preproc_filename
 from os.path import join, exists
 from constants_proj.AI_proj_params import MAX_MODEL, MAX_OBS, MIN_OBS, MIN_MODEL, MAX_INCREMENT, MIN_INCREMENT
 import os
@@ -86,9 +86,9 @@ def data_gen_from_preproc(input_folder_preproc,  config, ids, field_names, obs_f
                                                                 field_names, obs_field_names, var_field_names, output_fields,
                                                            start_row, start_col, rows, cols, norm_type=norm_type)
                     else:
-                        input_data, y_data = generateXandY(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
-                                                           field_names, obs_field_names, var_field_names, output_fields,
-                                                           start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
+                        input_data, y_data = generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
+                                                             field_names, obs_field_names, var_field_names, output_fields,
+                                                             start_row, start_col, rows, cols, norm_type=norm_type, perc_ocean=perc_ocean)
 
                 except Exception as e:
                     # print(F"Failed for {model_file_name} row:{start_row} col:{start_col}: {e}")

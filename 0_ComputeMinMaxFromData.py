@@ -1,6 +1,8 @@
 from info.info_hycom import read_field_names
-from inout.io_hycom import read_hycom_output
-from inout.io_netcdf import read_netcdf
+from config.PreprocConfig import get_preproc_config
+from datetime import datetime
+from inout.io_hycom import read_hycom_fields
+from inout.io_netcdf import read_netcdf_xr
 from img_viz.eoa_viz import EOAImageVisualizer
 from img_viz.constants import PlotMode
 from preproc.UtilsDates import get_days_from_month
@@ -11,7 +13,7 @@ import re
 import numpy as np
 from multiprocessing import Pool
 from constants_proj.AI_proj_params import PreprocParams, ParallelParams, ProjTrainingParams
-from config.MainConfig import get_training_2d
+from config.MainConfig_2D import get_training
 import matplotlib.pyplot as plt
 
 # Not sure how to move this inside the function
@@ -24,7 +26,7 @@ def ComputeOverallMinMaxVar():
     Computes the mean, max and variance for all the fields in the files
     :return:
     """
-    config = get_training_2d()
+    config = get_training()
     input_folder = config[ProjTrainingParams.input_folder_preproc]
     fields = config[ProjTrainingParams.fields_names]
     fields_obs = config[ProjTrainingParams.fields_names_obs]
@@ -61,14 +63,15 @@ def ComputeOverallMinMaxVar():
         day_of_year = int(c_file.split('_')[2].split('.')[0])
 
         model_file = join(input_folder, F'model_{year}_{day_of_year:03d}.nc')
-        inc_file = join(input_folder,F'increment_{year}_{day_of_year:03d}.nc')
+        inc_file = join(input_folder,F'background_{year}_{day_of_year:03d}.nc')
         obs_file = join(input_folder,F'obs_{year}_{day_of_year:03d}.nc')
 
         # *********************** Reading files **************************
         z_layers = [0]
         input_fields_model = read_netcdf(model_file, fields, z_layers)
         input_fields_obs = read_netcdf(obs_file, fields_obs, z_layers)
-        output_field_increment = read_netcdf(inc_file, fields, z_layers)
+        output_field_background = read_netcdf(inc_file, fields, z_layers)
+
 
         # =============== Computing max values for the model
         for idx_field, c_field_name in enumerate(fields):
@@ -103,9 +106,9 @@ def ComputeOverallMinMaxVar():
         # print(F"Cur max for obs: {max_values_obs}")
         # print(F"Cur min for obs: {min_values_obs}")
 
-        # =============== Computing max values for the increment
+        # =============== Computing max values for the background
         for idx_field, c_field_name in enumerate(fields):
-            da_np_c_field = output_field_increment[c_field_name]
+            da_np_c_field = output_field_background[c_field_name]
             # Computing mean also
             mean_values_inc[c_field_name] += np.nanmean(da_np_c_field) / tot_files
             c_max = np.nanmax(da_np_c_field)
@@ -126,14 +129,14 @@ def ComputeOverallMinMaxVar():
         day_of_year = int(c_file.split('_')[2].split('.')[0])
 
         model_file = join(input_folder, F'model_{year}_{day_of_year:03d}.nc')
-        inc_file = join(input_folder,F'increment_{year}_{day_of_year:03d}.nc')
+        inc_file = join(input_folder,F'background_{year}_{day_of_year:03d}.nc')
         obs_file = join(input_folder,F'obs_{year}_{day_of_year:03d}.nc')
 
         # *********************** Reading files **************************
         z_layers = [0]
         input_fields_model = read_netcdf(model_file, fields, z_layers)
         input_fields_obs = read_netcdf(obs_file, fields_obs, z_layers)
-        output_field_increment = read_netcdf(inc_file, fields, z_layers)
+        output_field_background = read_netcdf(inc_file, fields, z_layers)
 
         # =============== Computing max values for the model
         for idx_field, c_field_name in enumerate(fields):
@@ -148,9 +151,9 @@ def ComputeOverallMinMaxVar():
                 var_values_obs[c_field_name] += np.nanmean(data) / tot_files
             # print(F' {c_file}:{c_field_name}: {var_values_obs[c_field_name]}')
 
-        # =============== Computing max values for the increment
+        # =============== Computing max values for the background
         for idx_field, c_field_name in enumerate(fields):
-            da_np_c_field = output_field_increment[c_field_name]
+            da_np_c_field = output_field_background[c_field_name]
             var_values_inc[c_field_name] += np.nanmean( (da_np_c_field - mean_values_inc[c_field_name])**2 ) / tot_files
 
     print("----------------- Model --------------------")
@@ -218,15 +221,87 @@ def ComputeMinMaxSTDFields(file_name, fields_names, output_file):
 
     df.to_csv(output_file)
 
+def compute_stats_from_raw():
+    """
+    We compute the mean and std for each field in the preproc config
+    :return:
+    """
+    preproc_config = get_preproc_config()
+    input_folder_background =   preproc_config[PreprocParams.input_folder_hycom]
+    input_folder_observations = preproc_config[PreprocParams.input_folder_obs]
+    output_stats_file = preproc_config[PreprocParams.output_stats_file]
 
+    background_fields = preproc_config[PreprocParams.fields_names]
+    obs_fields = preproc_config[PreprocParams.fields_names_obs]
+
+    background_stats = {x:{'mean':0, 'std':0} for x in background_fields}
+    obs_stats = {x:{'mean':0, 'std':0} for x in obs_fields}
+
+    # --------- Reading all file names --------------
+    background_files = np.array([join(input_folder_background, x).replace(".a", "") for x in os.listdir(input_folder_background) if x.endswith('.a')])
+    background_files = background_files[0:100]
+    background_files.sort()
+
+    # --------- Preallocating ndarrays all file names --------------
+    z_layers = [0]
+    temp = read_hycom_fields(background_files[0], background_fields, z_layers) # Only in the surfacek
+    dims = temp[background_fields[0]].shape
+    background_data = {x:np.zeros([len(background_files), dims[1], dims[2]]) for x in background_fields}
+    obs_data = {x:np.zeros([len(background_files),  dims[1], dims[2]]) for x in obs_fields}
+
+    # Filling arrays with data
+    for f_idx, c_file in enumerate(background_files):
+        print(F"Working with file: {c_file}")
+        # Finding corresponding observation file
+        try:
+            sp_name = c_file.split("/")[-1].split(".")[1]
+            c_datetime = datetime.strptime(sp_name, "%Y_%j_18")
+            obs_file  = join(input_folder_observations, F"tsis_obs_gomb4_{c_datetime.strftime('%Y%m%d')}00.nc")
+            assert os.path.exists(obs_file)
+        except Exception as e:
+            print(F"Failed for {c_file}")
+            continue
+
+        temp = read_hycom_fields(c_file, background_fields, z_layers) # Only in the surfacek
+        if "thknss" in background_fields:
+            divide = 9806
+            temp["thknss"] = temp["thknss"]/divide
+        if "srfhgt" in background_fields:
+            divide = 9.806
+            temp["srfhgt"] = temp["srfhgt"]/divide
+        for c_field in background_fields:
+            background_data[c_field][f_idx, :, :] = temp[c_field]
+
+        temp = read_netcdf_xr(obs_file, obs_fields, z_layers)
+        for c_field in obs_fields:
+            obs_data[c_field][f_idx, :, :] = temp[c_field][:].astype(np.float64)
+
+    # Computing and storing the statistics
+    for c_field in background_fields:
+        background_stats[c_field]['mean'] = np.nanmean(background_data[c_field][f_idx, :, :])
+        background_stats[c_field]['std'] = np.nanstd(background_data[c_field][f_idx, :, :])
+
+    for c_field in obs_fields:
+        obs_stats[c_field]['mean'] = np.nanmean(obs_data[c_field][f_idx, :, :])
+        obs_stats[c_field]['std'] = np.nanstd(obs_data[c_field][f_idx, :, :])
+
+    # Saving the statistics
+    df = pd.DataFrame(background_stats)
+    df.to_csv(F"{output_stats_file}_background.csv")
+    df = pd.DataFrame(obs_stats)
+    df.to_csv(F"{output_stats_file}_obs.csv")
+    print(F"Saved: {output_stats_file}_background.csv")
+    print(F"Saved: {output_stats_file}_obs.csv")
+    print("Done! yeah finally!")
 
 def main():
     # p = Pool(NUM_PROC)
     # p.map(parallel_proc, range(NUM_PROC))
     # ---------- -------------
     # ComputeOverallMinMaxVar()
-    std_file = "/data/HYCOM/DA_HYCOM_TSIS/preproc/cov_mat/tops_ias_std.nc"
-    ComputeMinMaxSTDFields(std_file, ['tem', 'sal', 'ssh', 'mdt'], "STD_vars_min_max.csv")
+    compute_stats_from_raw()
+    # std_file = "/data/HYCOM/DA_HYCOM_TSIS/preproc/cov_mat/tops_ias_std.nc"
+    # ComputeMinMaxSTDFields(std_file, ['tem', 'sal', 'ssh', 'mdt'], "STD_vars_min_max.csv")
 
 if __name__ == '__main__':
     main()
