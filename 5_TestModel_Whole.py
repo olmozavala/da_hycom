@@ -31,65 +31,6 @@ from viz_utils.eoa_viz import select_colormap
 sys.path.append("hycom_utils/python")
 from hycom.io import read_hycom_fields, read_hycom_coords, read_field_names
 
-def main():
-
-    config = get_prediction_params()
-    # -------- For single model testing (not easy to test because everything must be defined in MainConfig_2D.py)--------------
-    # print("Testing single model....")
-    # test_model(config)
-
-    # -------- For all summary model testing --------------
-    print("Testing all the models inside summary.csv ....")
-    # summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
-    summary_file = "/home/olmozavala/DAN_HYCOM/OUTPUT/SUMMARY/summary.csv"
-    df = pd.read_csv(summary_file)
-
-    for model_id in range(len(df)):
-        model = df.iloc[model_id]
-        # Setting Network type (only when network type is UNET)
-        name = model["Name"]
-        print(F"Model id: {model_id}, name: {name}")
-        network_arch, network_type = getNeworkArchitectureAndTypeFromName(getNetworkTypeTxt(name))
-        config[ModelParams.MODEL] = network_arch
-        config[ProjTrainingParams.network_type] = network_type
-        # Setting input vars
-        inputs_path = model["Path"].replace("models", "Parameters")
-        input_file = join(inputs_path, listdir(inputs_path)[0]) # This should give you the file name with the inputs
-        in_df = pd.read_csv(input_file)
-        # Setting model vars
-        model_fields = in_df["Model"].item().split(',')
-        config[ProjTrainingParams.fields_names] = model_fields
-        # Setting obs vars
-        obs_fields = in_df["Obs"].item().split(',')
-        config[ProjTrainingParams.fields_names_obs] = obs_fields
-        # Setting composite vars
-        comp_fields = in_df["Comp"].item().split(',')
-        config[ProjTrainingParams.fields_names_composite] = comp_fields
-        # Setting output vars
-        output_fields = in_df["output"].item().split(',')
-        config[ProjTrainingParams.output_fields] = output_fields
-        config[ModelParams.OUTPUT_SIZE] = len(config[ProjTrainingParams.output_fields])
-        print(F"Input fields: {model_fields}, {obs_fields}, {comp_fields}  Output fields: {output_fields}")
-        # Model parameters
-        filter_size = int(in_df["Model_params"].item().split(':')[1])
-        config[ModelParams.FILTER_SIZE] = filter_size
-
-        # Setting BBOX
-        grows, gcols, bboxtxt = getBBOXandText(name)
-        config[ModelParams.INPUT_SIZE][0] = grows
-        config[ModelParams.INPUT_SIZE][1] = gcols
-        config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(comp_fields)
-        config[ProjTrainingParams.rows] = grows
-        config[ProjTrainingParams.cols] = gcols
-        # Setting model weights file
-        config[PredictionParams.model_weights_file] = join(model["Path"],model["Name"])
-        print(F"Model's weight file: {config[PredictionParams.model_weights_file]}")
-        # Set the name of the network
-        run_name = model["Path"].replace("/models","").split("/")[-1]  # The runname
-        config[TrainingParams.config_name] = run_name
-        test_model(config)
-        exit()
-
 def test_model(config):
     input_folder = config[PredictionParams.input_folder]
     output_folder = config[PredictionParams.output_folder]
@@ -483,3 +424,60 @@ def verifyBoundaries(start_col, cols, tot_cols):
 
 if __name__ == '__main__':
     main()
+
+
+    config = get_prediction_params()
+    # -------- For single model testing (not easy to test because everything must be defined in MainConfig_2D.py)--------------
+    # print("Testing single model....")
+    # test_model(config)
+
+    # -------- For all summary model testing --------------
+    print("Testing all the models inside summary.csv ....")
+    summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
+    # summary_file = "/home/olmozavala/DAN_HYCOM/OUTPUT/SUMMARY/summary.csv"
+    df = pd.read_csv(summary_file)
+
+    for model_id in range(len(df)):
+        model = df.iloc[model_id]
+        # Setting Network type (only when network type is UNET)
+        name = model["Name"]
+        print(F"Model id: {model_id}, name: {name}")
+        network_arch, network_type = getNeworkArchitectureAndTypeFromName(getNetworkTypeTxt(name))
+        config[ModelParams.MODEL] = network_arch
+        config[ProjTrainingParams.network_type] = network_type
+        # Setting input vars
+        inputs_path = model["Path"].replace("models", "Parameters")
+        input_file = join(inputs_path, listdir(inputs_path)[0]) # This should give you the file name with the inputs
+        in_df = pd.read_csv(input_file)
+        # Setting model vars
+        model_fields = in_df["Model"].item().split(',')
+        config[ProjTrainingParams.fields_names] = model_fields
+        # Setting obs vars
+        obs_fields = in_df["Obs"].item().split(',')
+        config[ProjTrainingParams.fields_names_obs] = obs_fields
+        # Setting composite vars
+        comp_fields = in_df["Comp"].item().split(',')
+        config[ProjTrainingParams.fields_names_composite] = comp_fields
+        # Setting output vars
+        output_fields = in_df["output"].item().split(',')
+        config[ProjTrainingParams.output_fields] = output_fields
+        config[ModelParams.OUTPUT_SIZE] = len(config[ProjTrainingParams.output_fields])
+        print(F"Input fields: {model_fields}, {obs_fields}, {comp_fields}  Output fields: {output_fields}")
+        # Model parameters
+        filter_size = int(in_df["Model_params"].item().split(':')[1])
+        config[ModelParams.FILTER_SIZE] = filter_size
+
+        # Setting BBOX
+        grows, gcols, bboxtxt = getBBOXandText(name)
+        config[ModelParams.INPUT_SIZE][0] = grows
+        config[ModelParams.INPUT_SIZE][1] = gcols
+        config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(comp_fields)
+        config[ProjTrainingParams.rows] = grows
+        config[ProjTrainingParams.cols] = gcols
+        # Setting model weights file
+        config[PredictionParams.model_weights_file] = join(model["Path"],model["Name"])
+        print(F"Model's weight file: {config[PredictionParams.model_weights_file]}")
+        # Set the name of the network
+        run_name = model["Path"].replace("/models","").split("/")[-1]  # The runname
+        config[TrainingParams.config_name] = run_name
+        test_model(config)
