@@ -145,7 +145,7 @@ def normalizeData(data, field_name, data_type = PreprocParams.type_model, norm_t
                 # return output_data.filled(np.nan)
                 return output_data.data
         except Exception as e:
-            print("Error from the normalization code")
+            print(f"Error from the normalization code: {e}")
             return data
 
 # if norm_type == PreprocParams.mean_var:
@@ -315,8 +315,12 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
             temp_data = temp_data/divide
 
         # TODO couldn't find a better way to check that there are not 'land' pixels. IF YOU CHANGE IT YOU NEED TO BE SURE IT IS WORKING!!!!!!
-        input_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_model,
-                                                   norm_type=norm_type, normalize=True)
+        if c_field != "diff_sst" and c_field != "diff_ssh" and c_field != "topo":
+            input_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_model,
+                                                    norm_type=norm_type, normalize=True)
+        else:
+            input_data[:, :, id_field] = temp_data
+
         if id_field == 0:
             c_mask = ma.getmaskarray(temp_data)
         id_field += 1

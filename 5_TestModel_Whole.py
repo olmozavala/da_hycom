@@ -1,6 +1,8 @@
 import os
 from os import listdir
 import sys
+sys.path.append("eoas_pyutils")
+sys.path.append("eoas_pyutils/hycom_utils/python")
 
 import matplotlib.pyplot as plt
 from scipy.ndimage import convolve, zoom, median_filter, maximum_filter, gaussian_filter, minimum_filter, percentile_filter, spline_filter
@@ -25,13 +27,12 @@ from datetime import datetime, timedelta
 from sklearn.metrics import mean_squared_error
 
 from ExtraUtils.NamesManipulation import *
-from viz_utils.eoa_viz import EOAImageVisualizer
+from viz_utils.eoa_viz import EOAImageVisualizer, BackgroundType
 from viz_utils.eoa_viz import select_colormap
 
-sys.path.append("hycom_utils/python")
 from hycom.io import read_hycom_fields, read_hycom_coords, read_field_names
 
-def test_model(config):
+def test_model(config, years):
     input_folder = config[PredictionParams.input_folder]
     output_folder = config[PredictionParams.output_folder]
     output_fields = config[ProjTrainingParams.output_fields]
@@ -130,12 +131,9 @@ def test_model(config):
     # for id_file, c_file in enumerate(increment_files[start_test_idx:]):
 
     # All files
-    # for id_file, c_file in enumerate(increment_files):
-    # Testing 2002 and 2006
-    # test_files = [x for x in increment_files if x.find("2002") != -1 or x.find("2006") != -1]
-    # Testing 2009 and 2010
-    test_files = [x for x in increment_files if x.find("2009") != -1 or x.find("2010") != -1]
+    test_files = [x for x in increment_files if any(x.find(str(y)) != -1 for y in years)]
     successful_files = []
+    successful_dates = []
     for id_file, c_file in enumerate(test_files):
         # Find current and next date
         sp_name = c_file.split("/")[-1].split(".")[1]
@@ -196,15 +194,16 @@ def test_model(config):
                 Y = np.expand_dims(y_data[s_row:s_row+rows, s_col:s_col+cols,:], axis=0)
 
                 #=====================  Make the prediction of the network =======================
-                #=====================  Here  =======================
-                new_x = np.zeros((30, 384, 520, 5))
-                for i in range(30):
-                    new_x[i,:,:,:] = X
-                # output_nn_original = model.predict(X, verbose=1)
+                # --------------- DELETE THIS JUST FOR TESTING TIME TO PREDICT ALL THE 30 LEVELS----------------
+                # new_x = np.zeros((30, 384, 520, 5))
+                # for i in range(30):
+                    # new_x[i,:,:,:] = X
+                    # output_nn_original_multiple = model.predict(new_x, verbose=1)
+                    # output_nn_original = output_nn_original_multiple[1,:,:,:]
+                    # output_nn_original = np.reshape(output_nn_original, (1, 384, 520, 1))
+                # --------------- DELETE THIS JUST FOR TESTING TIME TO PREDICT ALL THE 30 LEVELS----------------
                 start = time.time()
-                output_nn_original_multiple = model.predict(new_x, verbose=1)
-                output_nn_original = output_nn_original_multiple[1,:,:,:]
-                output_nn_original = np.reshape(output_nn_original, (1, 384, 520, 1))
+                output_nn_original = model.predict(X, verbose=1)
                 toc = time.time() - start
                 this_file_times.append(toc)
 
@@ -238,8 +237,8 @@ def test_model(config):
         all_whole_mean_times.append(np.mean(np.array(this_file_times)))
         all_whole_sum_times.append(np.sum(np.array(this_file_times)))
 
-        if day_of_year % 300 == 0: # Plot 10% of the times
-        # if True:
+        # if day_of_year % 300 == 0: # Plot 10% of the times
+        if False:
             all_cmin = cminmax_model[0]+cminmax_comp[0]+cminmax_obs[0]+cminmax_std[0]+cminmax_out[0]+cminmax_out[0]+cminmax_error[0]
             all_cmax = cminmax_model[1]+cminmax_comp[1]+cminmax_obs[1]+cminmax_std[1]+cminmax_out[1]+cminmax_out[1]+cminmax_error[1]
 
@@ -295,7 +294,7 @@ def test_model(config):
                                         file_name_prefix=F"Global_Input_and_CNN_{sp_name}",
                                         rot_90=True,
                                         flip_data=True,
-                                        cmap=cmap_model+cmap_comp+cmap_obs+cmap_std+cmap_out+cmap_out+cmap_error,
+                                        # cmap=cmap_model+cmap_comp+cmap_obs+cmap_std+cmap_out+cmap_out+cmap_error,
                                         # cmap_labels=cmap_label_model+cmap_label_comp+cmap_label_obs+cmap_label_out+cmap_label_out+cmap_label_error,
                                         # cols_per_row=len(field_names),
                                         # title=F"Input data: {field_names} and obs {obs_field_names}, increment {output_fields}, cnn {output_fields}")
@@ -306,24 +305,27 @@ def test_model(config):
             viz_obj = EOAImageVisualizer(output_folder=output_imgs_folder, disp_images=False,
                                          max_imgs_per_row=3,
                                          lats=lats, lons=lons,
+                                        background=BackgroundType.WHITE,
                                         show_var_names = True )
             viz_obj.plot_2d_data_np(np.concatenate((denorm_y.swapaxes(0,2), denorm_cnn.swapaxes(0,2), error.swapaxes(0,2))),
-                                        var_names=[F"TSIS {x}" for x in output_fields] + [F"CNN {x}" for x in output_fields] + [F'TSIS - CNN \n (Mean RMSE {rmse_cnn[i]:0.4f} C)' for i in range(len(output_fields))],
+                                        var_names=[F"TSIS {x}" for x in output_fields] + [F"CNN {x}" for x in output_fields] + [F'TSIS - CNN srfhgt \n (Mean RMSE {rmse_cnn[i]:0.4f} C)' for i in range(len(output_fields))],
                                         file_name_prefix=F"Global_WholeOutput_CNN_TSIS_{sp_name}",
                                         rot_90=True,
                                         flip_data=True,
-                                        cmap=cmap_out+cmap_out+cmap_error,
+                                        # cmap=cmap_out+cmap_out+cmap_error,
                                         mincbar=cminmax_out[0] + cminmax_out[0] + cminmax_error[0],
                                         maxcbar=cminmax_out[1] + cminmax_out[1] + cminmax_error[1],
                                         # cmap_labels=cmap_label_out+cmap_label_out+cmap_label_error,
                                         title=F"RMSE {rmse_txts} m {sp_name}")
 
-        successful_files.append(c_day_str)
+        successful_dates.append(c_day_str)
+        successful_files.append(str(c_file))
 
     print("DONE ALL FILES!!!!!!!!!!!!!")
     dic_summary = {
         "File": successful_files,
         "rmse": all_whole_rmse,
+        "dates": successful_dates,
         "times mean": all_whole_mean_times,
         "times sum": all_whole_sum_times,
     }
@@ -395,19 +397,23 @@ def denormalizeData(input, fields, data_type, norm_type):
     output = np.zeros(input.shape)
     for field_idx, c_field in enumerate(fields):
         # Denormalizing data...
-        if len(output.shape) == 4:
-            if type(data_type) is list:
-                output[:, :, :, field_idx] = normalizeData(input[:, :, :, field_idx], c_field, data_type=data_type[field_idx], norm_type= norm_type, normalize=False)
+
+        if c_field != "diff_sst" and c_field != "diff_ssh" and c_field != "topo":
+            if len(output.shape) == 4:
+                if type(data_type) is list:
+                    output[:, :, :, field_idx] = normalizeData(input[:, :, :, field_idx], c_field, data_type=data_type[field_idx], norm_type= norm_type, normalize=False)
+                else:
+                    output[:, :, :, field_idx] = normalizeData(input[:, :, :, field_idx], c_field, data_type=data_type, norm_type= norm_type, normalize=False)
+            elif len(output.shape) == 3:
+                if type(data_type) is list:
+                    output[:, :, field_idx] = normalizeData(input[:, :, field_idx], c_field, data_type=data_type[field_idx], norm_type= norm_type, normalize=False)
+                else:
+                    output[:, :, field_idx] = normalizeData(input[:, :, field_idx], c_field, data_type=data_type, norm_type= norm_type, normalize=False)
             else:
-                output[:, :, :, field_idx] = normalizeData(input[:, :, :, field_idx], c_field, data_type=data_type, norm_type= norm_type, normalize=False)
-        elif len(output.shape) == 3:
-            if type(data_type) is list:
-                output[:, :, field_idx] = normalizeData(input[:, :, field_idx], c_field, data_type=data_type[field_idx], norm_type= norm_type, normalize=False)
-            else:
-                output[:, :, field_idx] = normalizeData(input[:, :, field_idx], c_field, data_type=data_type, norm_type= norm_type, normalize=False)
+                print("ERROR Dimensions not found in denormalization!!!")
+                exit()
         else:
-            print("ERROR Dimensions not found in denormalization!!!")
-            exit()
+            output[:, :, field_idx] = input[:, :, field_idx]
 
     return output
 
@@ -423,17 +429,17 @@ def verifyBoundaries(start_col, cols, tot_cols):
     return start_col, donecol
 
 if __name__ == '__main__':
-    main()
-
 
     config = get_prediction_params()
+    years = [2002, 2006]  # Which years to evaluate the model
     # -------- For single model testing (not easy to test because everything must be defined in MainConfig_2D.py)--------------
     # print("Testing single model....")
     # test_model(config)
 
     # -------- For all summary model testing --------------
     print("Testing all the models inside summary.csv ....")
-    summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
+    # summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
+    summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/Summary_Only_Best.csv"
     # summary_file = "/home/olmozavala/DAN_HYCOM/OUTPUT/SUMMARY/summary.csv"
     df = pd.read_csv(summary_file)
 
@@ -480,4 +486,4 @@ if __name__ == '__main__':
         # Set the name of the network
         run_name = model["Path"].replace("/models","").split("/")[-1]  # The runname
         config[TrainingParams.config_name] = run_name
-        test_model(config)
+        test_model(config, years)

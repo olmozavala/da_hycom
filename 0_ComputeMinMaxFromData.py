@@ -1,20 +1,17 @@
-from info.info_hycom import read_field_names
+import sys
+sys.path.append("eoas_pyutils")
+sys.path.append("eoas_pyutils/hycom_utils/python")
+
+from hycom.io import read_hycom_fields
 from config.PreprocConfig import get_preproc_config
 from datetime import datetime
-from inout.io_hycom import read_hycom_fields
-from inout.io_netcdf import read_netcdf_xr
-from img_viz.eoa_viz import EOAImageVisualizer
-from img_viz.constants import PlotMode
-from preproc.UtilsDates import get_days_from_month
-from preproc.metrics import mse
+from io_utils.io_netcdf import read_netcdf_xr, read_netcdf
 from io_project.read_utils import *
 import pandas as pd
-import re
 import numpy as np
 from multiprocessing import Pool
-from constants_proj.AI_proj_params import PreprocParams, ParallelParams, ProjTrainingParams
+from constants_proj.AI_proj_params import PreprocParams, ProjTrainingParams
 from config.MainConfig_2D import get_training
-import matplotlib.pyplot as plt
 
 # Not sure how to move this inside the function
 NUM_PROC = 10
@@ -294,7 +291,8 @@ def compute_stats_from_raw():
     print(F"Saved: {output_stats_file}_obs.csv")
     print("Done! yeah finally!")
 
-def main():
+
+if __name__ == '__main__':
     # p = Pool(NUM_PROC)
     # p.map(parallel_proc, range(NUM_PROC))
     # ---------- -------------
@@ -303,6 +301,4 @@ def main():
     # std_file = "/data/HYCOM/DA_HYCOM_TSIS/preproc/cov_mat/tops_ias_std.nc"
     # ComputeMinMaxSTDFields(std_file, ['tem', 'sal', 'ssh', 'mdt'], "STD_vars_min_max.csv")
 
-if __name__ == '__main__':
-    main()
 

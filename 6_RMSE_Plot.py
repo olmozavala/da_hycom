@@ -1,9 +1,12 @@
+# %%
 import matplotlib.pyplot as plt
 import os
 from os.path import join
 import pandas as pd
 from ExtraUtils.NamesManipulation import *
 import numpy as np
+
+# This code is the one that makes all the bar plots varying the options selected in each training
 
 fontsize = 20
 colors = ['pink', 'lightblue', 'lightgreen','lightyellow','lightgrey']
@@ -63,11 +66,13 @@ def makeScatter(c_summary, group_field, xlabel, output_file, title_txt="", units
     # plt.show()
     plt.close()
 
-# imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/Prediction2002_2006/imgs"
-imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/PredictionPaper/imgs"
+imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/Prediction2002_2006/imgs"
+# imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/PredictionPaper/imgs"
 summary_folder = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/"
 # imgs_prediction_folder = "/home/olmozavala/DAN_HYCOM/OUTPUT/Prediction2002_2006/imgs/"
 # summary_folder = "/home/olmozavala/DAN_HYCOM/OUTPUT/SUMMARY/"
+# summary_file_name = "summary.csv"
+summary_file_name = "Summary_Only_Best.csv"
 
 all_folders = [ name for name in os.listdir(imgs_prediction_folder) if os.path.isdir(os.path.join(imgs_prediction_folder, name)) ]
 all_folders.sort()
@@ -76,12 +81,9 @@ For_2002_2006 = False  # Indicates if we are doing it for 2002 and 2006
 generate_scatter_by_model = False # These are the individual scatter plots for each model
 
 # Define the summary_file
-summary_file = join(summary_folder,"summary.csv")
+summary_file = join(summary_folder,summary_file_name)
 
-if For_2002_2006:
-    output_file = join(summary_folder,"summary_RMSE_2002_2006.csv")
-else:
-    output_file = join(summary_folder,"summary_RMSE.csv")
+output_file = join(summary_folder, f"RMS_{summary_file_name}.csv")
 
 summary_df = pd.read_csv(summary_file)
 training_folder = '/'.join(np.array(os.path.dirname(summary_df.iloc[0]["Path"]).split("/"))[:-1])
@@ -98,7 +100,8 @@ for c_model in all_folders:
     cur_sum_model = summary_df["Path"] == join(training_folder,c_model,"models")
 
     split_model = c_model.split("_")
-    model_title = F"{split_model[0]} %{int(split_model[4])/10} {split_model[6]}_{split_model[7]} {split_model[8]} {split_model[12]}"
+    # model_title = F"{split_model[0]} %{int(split_model[4])/10} {split_model[6]}_{split_model[7]} {split_model[8]} {split_model[12]}"
+    model_title = F"{split_model[0]} %{int(split_model[4])/10} {split_model[6]}_{split_model[7]} {split_model[8]} {split_model[11]}"
     try:
         network = getNetworkTypeTxt(c_model)
         output_field = getOutputFieldsTxt(c_model)
@@ -109,7 +112,11 @@ for c_model in all_folders:
                 rms_mean = df["rmse"]
                 dates_str = df["File"].values
             else:
-                rms_mean = np.array([float(x[1:-1].split(' ')[0]) for x in df["rmse"]]) # Used in paper
+                # Check if the first column of the dataframe is a number
+                if isinstance(df["rmse"][0], (int, float)):
+                    rms_mean = df["rmse"].values
+                else:
+                    rms_mean = np.array([float(x[1:-1].split(' ')[0]) for x in df["rmse"]]) # Used in paper
                 dates_str = [int(x.split("_")[-2])for x in df["File"]]
 
             if np.any(np.isnan(rms_mean)):
@@ -152,7 +159,9 @@ OUT = "Output vars"
 IN  = "Input vars"
 LOSS  = "Loss value"
 PERCOCEAN = "PercOcean"
+print("Done reading data")
 
+# %%
 # Plot summary by
 # output_folder = "/home/olmozavala/Desktop/outputs"
 output_folder = summary_folder
@@ -163,7 +172,7 @@ c_summary = c_summary[c_summary[PERCOCEAN] == 0.0]  # Only PercOcean 0.0
 makeScatter(c_summary, NET, "Network Architecture", join(output_folder,"By_Network_Type_Scatter_TestSet.png"),
             title_txt="Network Architecture",
             units="(meters)")
-#
+# %%
 # # ========= Compare BBOX ======
 c_summary = summary_df[np.logical_and((summary_df[IN] == "ssh").values, (summary_df[OUT] == "SRFHGT").values)]
 c_summary = c_summary[c_summary[NET] == "2DUNET"]   # Only UNet

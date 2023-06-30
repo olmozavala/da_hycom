@@ -1,11 +1,13 @@
-from info.info_hycom import read_field_names
+import sys
+sys.path.append("eoas_pyutils")
+sys.path.append("eoas_pyutils/hycom_utils/python")
+
+from hycom.io import read_hycom_fields, read_hycom_coords, read_field_names
 from datetime import datetime
-from hycom.io import read_hycom_fields, read_field_names, read_hycom_coords
-from inout.io_netcdf import read_netcdf
-from img_viz.eoa_viz import EOAImageVisualizer
-from img_viz.constants import PlotMode
-from preproc.UtilsDates import get_days_from_month
-from preproc.metrics import mse
+from io_utils.io_netcdf import read_netcdf
+from viz_utils.eoa_viz import EOAImageVisualizer
+from viz_utils.eoa_viz import PlotMode
+from io_utils.dates_utils import get_days_from_month
 import pandas as pd
 from io_project.read_utils import *
 import xarray as xr
@@ -24,7 +26,7 @@ _maxlat = 31.9267
 _maxlon = -56.08
 
 # # Here we identify lat and lons before hand. TODO improve this making it local to functions
-coords_file = "/data/HYCOM/DA_HYCOM_TSIS/preproc/coords/regional.grid.a"
+coords_file =  "/data/HYCOM/DA_HYCOM_TSIS/Topography/regional.grid.a"
 # coord_fields = [ 'plon','plat','qlon','qlat','ulon','ulat','vlon','vlat']
 coord_fields = ['plon','plat']
 print("Reading hycom coordinates....")
@@ -61,7 +63,7 @@ def preproc_data(proc_id):
             days_of_month, days_of_year = get_days_from_month(c_month)
             # Rads all the files for this month
             da_files, da_paths = get_hycom_file_name(input_folder_increment, c_year, c_month)
-            hycom_files, hycom_paths = get_hycom_file_name(input_folder_model, c_year, c_month)
+            hycom_files, hycom_paths = get_hycom_file_name(input_folder_model, c_year, c_month, day_idx=2)
             obs_files, obs_paths = get_obs_file_names(input_folder_obs, c_year, c_month)
 
             # This for is fixed to be able to run in parallel

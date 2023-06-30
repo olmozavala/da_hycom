@@ -1,3 +1,4 @@
+# %%
 import os
 import sys
 sys.path.append("eoas_pyutils/")
@@ -17,9 +18,7 @@ import cmocean.cm as cm
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 
-
-#%% ================== Paper ==============
-#%% ================== Gom Domain==============
+# %% ================== Plot Gom Domain==============
 def gomdomain():
     output_folder = "/home/olmozavala/Dropbox/MyProjects/EOAS/COAPS/MURI_AI_Ocean/Data_Assimilation/HYCOM-TSIS/ImagesForPresentation/"
 
@@ -39,14 +38,15 @@ def gomdomain():
     viz_obj.plot_3d_data_npdict(hycom_fields, ['temp'], [0], 'Gulf of Mexico domain (SST)', 'GoM_Domain',
                                 mincbar=[15], maxcbar=[27])
 
-def LC_plot():
-    years = [2002, 2006]
-    output_folder = "/home/olmozavala/Dropbox/MyProjects/EOAS/COAPS/MURI_AI_Ocean/Data_Assimilation/HYCOM-TSIS/ImagesForPresentation/"
+# %% ================= In case you want to add one example of how the LC is in extended or retracted state
+def LC_plot(dates, dates_str):
+    output_folder = "/home/olmozavala/Dropbox/Apps/Overleaf/Book_Chapter_CNN_DA/imgs"
     model_folder = "/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/incup/"
 
     all_files = os.listdir(model_folder)
     all_files.sort()
-    for i, model_file in enumerate(all_files):
+    for i, c_date in enumerate(dates):
+        model_file = f'incupd.{c_date}_18'
         hycom_fields = read_hycom_fields(join(model_folder, model_file), ['srfhgt'], [0])
         ssh = hycom_fields['srfhgt'][0,:,:]
 
@@ -56,35 +56,74 @@ def LC_plot():
             lons = grid.mplon[0,:]
 
         viz_obj = EOAImageVisualizer(lats=lats, lons=lons, disp_images=True, output_folder=output_folder,
-                                     units='$^\circ$C',
-                                     background=BackgroundType.WHITE,
-                                     contourf=True,
-                                     coastline=True)
-        viz_obj.plot_3d_data_npdict(hycom_fields, ['srfhgt'], [0], 'Gulf of Mexico domain (SST)', 'GoM_Domain',
-                                    mincbar=[15], maxcbar=[27])
+                                        units='m',
+                                        background=BackgroundType.WHITE,
+                                        contourf=True,
+                                        coastline=True)
 
-        lc_from_ssh(ssh, lons, lats, np.nanmean(ssh))
-        exit()
+        lc = lc_from_ssh(ssh, lons, lats, np.nanmean(ssh))
 
-# LC_plot()
-# For RMSE summary
-# rmse_file = "/data/HYCOM/DA_HYCOM_TSIS/Prediction2002_2006/imgs/0002_GoM2D_STDNORM_PERCOCEAN_0_NET_2DUNET_srfhgt_ssh-ssh-err-sst-sst-err_No-STD_OUT_SRFHGT_384x520/Global_RMSE_and_times.csv"
-rmse_file = "/data/HYCOM/DA_HYCOM_TSIS/Prediction2002_2006/imgs/0001_GoM2D_STDNORM_PERCOCEAN_0_NET_2DUNET_srfhgt_ssh-ssh-err-sst-sst-err_No-STD_OUT_SRFHGT_384x520/Global_RMSE_and_times.csv"
-# df_all = pd.read_csv(rmse_file, parse_dates=[1])
-df_all = pd.read_csv(rmse_file)
-for year in ("2002", "2006"):
-    df = df_all[df_all.File.str.contains(year)]
-    fig, ax = plt.subplots(1,1, figsize=(7,5))
-    ax.scatter([x.replace("_", "/") for x in df.File], df.rmse, s=1)
-    ax.set_xticks(np.round(range(len(df.File))))
-    plt.xticks(rotation=30)
-    plt.locator_params(nbins=10)
-    plt.subplots_adjust(bottom=0.18)
-    ax.set_title(F"SSH RMSE for year {year} (mean RMSE: {df.rmse.mean():0.4f} m)")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("RMSE of SSH in m")
-    ax.set_ylim((0.002, 0.010))
-    plt.show()
+        mylinestring = LineString(list(lc))
+        viz_obj.__setattr__('additional_polygons', [mylinestring])
+        viz_obj.plot_3d_data_npdict(hycom_fields, ['srfhgt'], [0], title=f'Gulf of Mexico SSH {dates_str[i]}',
+                                    file_name_prefix=f'GoM_Domain_{dates_str[i]}', mincbar=[15], maxcbar=[27])
+
+
+dates = ['2002_110', '2006_110']
+dates_str = ['2002-04-20', '2006-04-20']
+LC_plot(dates, dates_str)
+
+# %% ================  For RMSE summary
+def RMSE_Plot(file_name):
+    rmse_file = "/data/HYCOM/DA_HYCOM_TSIS/PredictionBestPaper/imgs/0001_GoM2D_STDNORM_PERCOCEAN_0_NET_2DUNET_srfhgt_ssh-ssh-err-sst-sst-err_No-STD_OUT_SRFHGT_384x520/Global_RMSE_and_times_2010_BK.csv"
+    # rmse_file = "/data/HYCOM/DA_HYCOM_TSIS/Prediction2002_2006/imgs/0001_GoM2D_STDNORM_PERCOCEAN_0_NET_2DUNET_srfhgt_ssh-ssh-err-sst-sst-err_No-STD_OUT_SRFHGT_384x520/Global_RMSE_and_times_2002_2006_BK.csv"
+    df_all = pd.read_csv(rmse_file)
+    # for year in ["2002", "2006"]:
+    for year in ["2010"]:
+        df = df_all[df_all.File.str.contains(year)]
+        # Remove outliers
+        df = df[df.rmse < 0.006]
+
+        x = [x.replace("_", "/") for x in df.dates]
+        y = df.rmse
+
+        fig, ax = plt.subplots(1,1, figsize=(9,5))
+        ax.scatter(x, y*1000,  s=2)
+        # Make a vertical line after the first 292 elements
+        ax.plot([x[292], x[292]], [0, 10], color='green', linestyle='-', linewidth=1)
+        mean_train = np.mean(y[0:292])*1000
+        mean_val = np.mean(y[292:])*1000
+        ax.plot([x[0], x[-1]], [mean_train, mean_train], color='red', linestyle='--', linewidth=1,
+                label=F"Mean RMSE: {mean_train:0.2f} mm")
+        ax.plot([x[0], x[-1]], [mean_val, mean_val], color='darkseagreen', linestyle='--', linewidth=1,
+                label=F"Mean validation: {mean_val:0.2f} mm")
+        # mean_all = np.mean(y)*1000
+        # ax.plot([x[0], x[-1]], [mean_all, mean_all], color='red', linestyle='--', linewidth=1,
+                # label=F"Mean validation: {mean_all:0.2f} mm")
+        ax.set_xticks(np.round(range(len(df.dates))))
+        plt.xticks(rotation=25)
+        plt.locator_params(nbins=15)
+        plt.subplots_adjust(bottom=0.18)
+        # ax.set_title(F"SSH RMSE for year {year} (mean RMSE: {df.rmse.mean()*1000:0.2f} mm)")
+        # ax.set_title(F"Sea Surface Hight RMSE for year {year} training and validation sets")
+        ax.set_title(F"Sea Surface Hight RMSE for year {year}", fontsize=16)
+        ax.set_xlabel("Date", fontsize=12)
+        ax.set_ylabel("RMSE of SSH in mm", fontsize=12)
+        ax.set_ylim((2.8, 6))
+        # Add legend
+        ax.legend(loc='upper left', fontsize=10)
+        # Tight plot
+        plt.tight_layout()
+        # Save figure
+        plt.savefig(f'{file_name}_{year}.png', dpi=300)
+        plt.show()
+
+file_name = "/home/olmozavala/Dropbox/Apps/Overleaf/Book_Chapter_CNN_DA/imgs/GoM_RMSE"
+RMSE_Plot(file_name)
+
+# %%
+print(x)
+
 
 #%%  For raster examples
 # Obs loc /data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/obs/qcobs_roif/tsis_obs_gomb4_2001070200.nc
