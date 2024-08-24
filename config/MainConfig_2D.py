@@ -102,8 +102,10 @@ def get_prediction_params():
     cur_config = {
         TrainingParams.config_name: _run_name,
         PredictionParams.input_folder: _preproc_folder,
-        PredictionParams.output_folder: F"{join(_output_folder,'Prediction2002_2006')}",
-        PredictionParams.output_imgs_folder: F"{join(_output_folder,'Prediction2002_2006','imgs')}",
+        # PredictionParams.output_folder: F"{join(_output_folder,'Prediction2002_2006')}",
+        # PredictionParams.output_imgs_folder: F"{join(_output_folder,'Prediction2002_2006','imgs')}",
+        PredictionParams.output_folder: F"{join(_output_folder,'PredictionSimulated41Depths')}",
+        PredictionParams.output_imgs_folder: F"{join(_output_folder,'PredictionSimulated41Depths','imgs')}",
         PredictionParams.show_imgs: False,
         PredictionParams.model_weights_file: join(weights_folder, "0002_GoM2D_STDNORM_PERCOCEAN_0_NET_2DUNET_srfhgt_ssh-ssh-err-sst-sst-err_No-STD_OUT_SRFHGT_384x520_2021_10_24_18_05-epoch-64-loss-0.00018359.hdf5"),
         PredictionParams.metrics: mymetrics.only_ocean_mse,

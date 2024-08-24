@@ -18,11 +18,11 @@ import cmocean.cm as cm
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 
-# %% ================== Plot Gom Domain==============
+# %% ================== Plot Gom Domain Oringal==============
+bbox = [-98, -77.04, 18.091648, 31.960648]
 def gomdomain():
     output_folder = "/home/olmozavala/Dropbox/MyProjects/EOAS/COAPS/MURI_AI_Ocean/Data_Assimilation/HYCOM-TSIS/ImagesForPresentation/"
-
-    model_file = "/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/incup/incupd.2009_001_18"
+    model_file = "/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/incup/incupd.2010_003_18"
     hycom_fields = read_hycom_fields(model_file, ['temp','srfhgt'], [0])
     grid = xr.load_dataset("/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/topo/gridinfo.nc")
     hycom_fields['temp'][np.isnan(hycom_fields['srfhgt'])] = np.nan
@@ -30,13 +30,134 @@ def gomdomain():
     lats = grid.mplat[:,0]
     lons = grid.mplon[0,:]
 
+    # Obtain BBOX from lats and lons
+    print(f"bbox: {bbox}")
     viz_obj = EOAImageVisualizer(lats=lats, lons=lons, disp_images=True, output_folder=output_folder,
                                  units='$^\circ$C',
                                  background=BackgroundType.WHITE,
                                  contourf=True,
                                  coastline=True)
-    viz_obj.plot_3d_data_npdict(hycom_fields, ['temp'], [0], 'Gulf of Mexico domain (SST)', 'GoM_Domain',
+    viz_obj.plot_3d_data_npdict(hycom_fields, ['temp'], [0], 'Gulf of Mexico domain', 'f01',
+                                plot_mode=PlotMode.MERGED,
                                 mincbar=[15], maxcbar=[27])
+    
+gomdomain()
+
+# %% ================== Plot Gom Domain Bathymetry==============
+bat_file = "/home/olmozavala/Dropbox/TestData/netCDF/Bathymetry/w100n40.nc"
+bat_data = xr.load_dataset(bat_file)
+# Crop to bbox
+bat_data = bat_data.sel(x=slice(bbox[0], bbox[1]), y=slice(bbox[2], bbox[3]))
+# %% Plot with cartopy 
+fig = plt.figure(figsize=(12, 10))
+ax = plt.axes(projection=ccrs.PlateCarree())
+
+# Assuming bbox contains the extents [longitude_min, longitude_max, latitude_min, latitude_max]
+bbox = [-98, -77.04, 18.09, 31.96]
+ax.set_extent(bbox)
+
+# Plot iso-contours of bathymetry data
+contour_levels = np.linspace(-5000, 0, 100)  # Adjust range and number of levels as needed
+im = ax.contourf(bat_data.x, bat_data.y, bat_data.z, levels=contour_levels, cmap=cm.deep, alpha=0.4)
+
+# Plot contour lines above the filled contour
+contour_levels = [-5000, -2000, -1000, -500, -200, -100, -5, 0]
+cont_lines = ax.contour(bat_data.x, bat_data.y, bat_data.z, levels=contour_levels, colors='k', linewidths=0.5)
+ax.clabel(cont_lines, inline=True, fontsize=10, fmt='%1.0f m', colors='white')  # Label the contours
+
+# Set title and coastlines
+ax.set_title("Gulf of Mexico Domain", fontsize=24)
+ax.coastlines(resolution='10m', color='black', linewidth=1)
+
+# Customize gridlines
+gl = ax.gridlines(draw_labels=True, color='gray', alpha=0.5, linestyle='--')
+gl.top_labels = False  # Disable labels at the top
+gl.right_labels = False  # Disable labels on the right
+gl.xlabel_style = {'size': 18, 'color': 'black'}  # Customize font size and color of x labels
+gl.ylabel_style = {'size': 18, 'color': 'black'}  # Customize font size and color of y labels
+plt.tight_layout()
+
+# Save the plot without extra white space
+plt.savefig('/home/olmozavala/Dropbox/Apps/Overleaf/CNN_DA/images/f01.png', bbox_inches='tight', pad_inches=.1)
+
+plt.show()
+# %% ================= Similar plot but with random boxes of size 384x520
+
+for desired_size in [0, 160, 120, 80]:
+    fig = plt.figure(figsize=(12, 10))
+    ax = plt.axes(projection=ccrs.PlateCarree())
+
+    # Assuming bbox contains the extents [longitude_min, longitude_max, latitude_min, latitude_max]
+    bbox = [-98, -77.04, 18.09, 31.96]
+    ax.set_extent(bbox)
+
+    model_file = "/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/incup/incupd.2010_003_18"
+    hycom_fields = read_hycom_fields(model_file, ['temp','srfhgt'], [0])
+    grid = xr.load_dataset("/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/topo/gridinfo.nc")
+    hycom_fields['temp'][np.isnan(hycom_fields['srfhgt'])] = np.nan
+
+    # Plot temperature using contourf
+    contour_levels = np.linspace(15, 28, 100)  # Adjust range and number of levels as needed
+    im = ax.contourf(grid.mplon, grid.mplat, hycom_fields['temp'][0,:,:], levels=contour_levels, cmap=cm.thermal, alpha=0.9)
+
+    # Plot contour lines above the filled contour
+    contour_levels = [-5000, -2000, -1000, -500, -200, -100, -5, 0]
+    cont_lines = ax.contour(bat_data.x, bat_data.y, bat_data.z, levels=contour_levels, colors='k', linewidths=0.5, alpha=0.8)
+    ax.clabel(cont_lines, inline=True, fontsize=8, fmt='%1.0f m', colors='white')  # Label the contours
+
+    long_min, long_max, lat_min, lat_max = [bbox[0], bbox[1], bbox[2], bbox[3]]
+
+    # Generate random boxes of size 120x120 pixels. We need to tranform the pixel size to degrees
+    # Since the size of the figure is 385x520 pixels, we need to divide the size of the domain by the size of the figure
+    # to get the size of the box in degrees
+    line_width = 5.5
+    title_font = 50
+    xsize = (desired_size/520)*(long_max - long_min)
+    ysize = (desired_size/385)*(lat_max - lat_min)
+    for i in range(6):
+        # Generate random longitude and latitude within the defined bounds
+        lon0 = np.random.uniform(long_min, long_max - xsize)  # Subtract to avoid going out of bounds
+        lat0 = np.random.uniform(lat_min, lat_max - ysize)
+        lon1 = lon0 + xsize  # Width of 1 degree longitude
+        lat1 = lat0 + ysize  # Height of 1 degree latitude
+
+        # Plot box
+        ax.add_patch(plt.Rectangle((lon0, lat0), lon1-lon0, lat1-lat0, edgecolor='red', facecolor='none', linewidth=line_width, transform=ccrs.PlateCarree()))
+
+    # Add patch for the full domain
+
+    # Set title and coastlines
+    if desired_size == 0:
+        border = .08
+        ax.add_patch(plt.Rectangle((long_min+border, lat_min+border), long_max-long_min-2*border, lat_max-lat_min-2*border, 
+                                edgecolor='red', facecolor='none', linewidth=line_width, transform=ccrs.PlateCarree()))
+        ax.set_title(f"Window size 385x520", fontsize=title_font)
+    else:
+        ax.set_title(f"Window size {desired_size}x{desired_size}", fontsize=title_font)
+    ax.coastlines(resolution='10m', color='black', linewidth=1)
+
+    # Customize gridlines
+    gl = ax.gridlines(draw_labels=False, color='gray', alpha=0.5, linestyle='--')
+    gl.top_labels = False  # Disable labels at the top
+    gl.right_labels = False  # Disable labels on the right
+    gl.xlabel_style = {'size': 14, 'color': 'black'}  # Customize font size and color of x labels
+    gl.ylabel_style = {'size': 14, 'color': 'black'}  # Customize font size and color of y labels
+    plt.tight_layout()
+
+    # Save the plot without extra white space
+    plt.savefig(f'/home/olmozavala/Dropbox/Apps/Overleaf/CNN_DA/images/f03_{desired_size}.png', bbox_inches='tight', pad_inches=.1)
+
+    plt.show()
+
+# %% Merge images vertically from the terminal
+root_folder = '/home/olmozavala/Dropbox/Apps/Overleaf/CNN_DA/images'
+cmd = f"convert "
+for desired_size in [0, 160, 120, 80]:
+    cmd += f"{root_folder}/f03_{desired_size}.png {root_folder}/spacer.png "
+cmd += f"+append {root_folder}/f03.png"
+print(cmd)
+# Runc command
+os.system(cmd)
 
 # %% ================= In case you want to add one example of how the LC is in extended or retracted state
 def LC_plot(dates, dates_str):
@@ -94,9 +215,9 @@ def RMSE_Plot(file_name):
         mean_train = np.mean(y[0:292])*1000
         mean_val = np.mean(y[292:])*1000
         ax.plot([x[0], x[-1]], [mean_train, mean_train], color='red', linestyle='--', linewidth=1,
-                label=F"Mean RMSE: {mean_train:0.2f} mm")
+                label=F"Mean Training RMSE: {mean_train:0.2f} mm")
         ax.plot([x[0], x[-1]], [mean_val, mean_val], color='darkseagreen', linestyle='--', linewidth=1,
-                label=F"Mean validation: {mean_val:0.2f} mm")
+                label=F"Mean Test RMSE: {mean_val:0.2f} mm")
         # mean_all = np.mean(y)*1000
         # ax.plot([x[0], x[-1]], [mean_all, mean_all], color='red', linestyle='--', linewidth=1,
                 # label=F"Mean validation: {mean_all:0.2f} mm")
@@ -151,9 +272,9 @@ lons = grid.mplon[0,:]
 img = plt.imread('/home/olmozavala/Dropbox/TutorialsByMe/Python/PythonExamples/Python/MatplotlibEx/map_backgrounds/bluemarble.png')
 extent = (lons.min(), lons.max(), lats.min(), lats.max())
 img_extent = (-180, 180, -90, 90)
-fig, ax = plt.subplots(1, 1, figsize=(10,6), subplot_kw={'projection': ccrs.PlateCarree()})
-ax.stock_img()
-ax.imshow(img, origin='upper', extent=img_extent, transform=ccrs.PlateCarree())
+# im = ax.contourf(lons, lats, ssh_model['srfhgt'][0,:,:], levels=levels, cmap=cm.delta, extent=extent)
+# .stock_img()extent, transform=ccrs.PlateCarsrfhg), cmap=cm.delta, extent=extent)
+im = ax.imshow(hycom_fields['temp'][0,:,:]
 levels = np.around(np.linspace(-.6,.6,80), 2)
 # im = ax.contourf(lons, lats, ssh_model['srfhgt'][0,:,:], levels=levels, cmap=cm.delta, extent=extent)
 # im = ax.contourf(lons, lats, hycom_fields['srfhgt'][0,:,:], levels=levels, cmap=cm.delta, extent=extent)

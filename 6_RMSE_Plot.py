@@ -15,7 +15,8 @@ def makeScatter(c_summary, group_field, xlabel, output_file, title_txt="", units
     if c_summary.empty:
         return
 
-    RMSE = "RMSE"
+    # RMSE = "RMSE"
+    RMSE = "Loss value"
     names = []
     data = []
     fig, ax = plt.subplots(figsize=(10,6))
@@ -61,9 +62,10 @@ def makeScatter(c_summary, group_field, xlabel, output_file, title_txt="", units
     else:
         ax.set_title(F"RMSE by {title_txt} for the test set", fontsize=fontsize)
     # plt.xticks(range(len(names)),names)
+    print("Plotting....")
     plt.tight_layout()
     plt.savefig(output_file)
-    # plt.show()
+    plt.show()
     plt.close()
 
 imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/Prediction2002_2006/imgs"
@@ -71,8 +73,8 @@ imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/Prediction2002_2006/imgs"
 summary_folder = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/"
 # imgs_prediction_folder = "/home/olmozavala/DAN_HYCOM/OUTPUT/Prediction2002_2006/imgs/"
 # summary_folder = "/home/olmozavala/DAN_HYCOM/OUTPUT/SUMMARY/"
-# summary_file_name = "summary.csv"
-summary_file_name = "Summary_Only_Best.csv"
+summary_file_name = "summary.csv"
+# summary_file_name = "Summary_Only_Best"
 
 all_folders = [ name for name in os.listdir(imgs_prediction_folder) if os.path.isdir(os.path.join(imgs_prediction_folder, name)) ]
 all_folders.sort()
@@ -163,12 +165,13 @@ print("Done reading data")
 
 # %%
 # Plot summary by
-# output_folder = "/home/olmozavala/Desktop/outputs"
-output_folder = summary_folder
+output_folder = "/home/olmozavala/Dropbox/Apps/Overleaf/CNN_DA/EXTRA/imgs"
+# output_folder = summary_folder
 # ========= Compare Network type ======
 c_summary = summary_df[np.logical_and((summary_df[IN] == "ssh").values, (summary_df[OUT] == "SRFHGT").values)]
-c_summary = c_summary[c_summary["BBOX"] == "384x520"]  # Only 160x160
-c_summary = c_summary[c_summary[PERCOCEAN] == 0.0]  # Only PercOcean 0.0
+c_summary = c_summary[c_summary["BBOX"] == "384x520"]  # Only ifull domain
+c_summary = c_summary[c_summary[PERCOCEAN] <= 0.1]  # Only PercOcean 0.0
+# def makeScatter(c_summary, group_field, xlabel, output_file, title_txt="", units=""):
 makeScatter(c_summary, NET, "Network Architecture", join(output_folder,"By_Network_Type_Scatter_TestSet.png"),
             title_txt="Network Architecture",
             units="(meters)")
@@ -199,3 +202,4 @@ c_summary = c_summary[c_summary["BBOX"] == "384x520"]  # Only 160x160
 c_summary = c_summary[c_summary[PERCOCEAN] == 0.0]  # Only PercOcean 0.0
 makeScatter(c_summary, OUT, "Output fields", join(output_folder,"By_Output_Type_Scatter_TestSet.png"), "output fields",
             units="(meters and degrees)")
+# %%
