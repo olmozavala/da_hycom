@@ -1,3 +1,4 @@
+# %%
 import os
 from os import listdir
 import sys
@@ -8,6 +9,7 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import convolve, zoom, median_filter, maximum_filter, gaussian_filter, minimum_filter, percentile_filter, spline_filter
 from io_project.read_utils import generateXandY2D, normalizeData
 
+import tensorflow as tf
 from tensorflow.keras.utils import plot_model
 from io_utils.io_netcdf import read_netcdf, read_netcdf_xr
 from io_utils.io_common import create_folder
@@ -120,7 +122,7 @@ def test_model(config, years):
 
     start_test_idx = 576+73
 
-    coords_file = "/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/topo/regional.grid.a"
+    coords_file = "/nexsan/people/abozec/TSIS/GOMb0.04/topo/regional.grid.a"
     print(F"The coords available are: {read_field_names(coords_file)}")
     coords = read_hycom_coords(coords_file, ['plon:', 'plat:'])
     lons = coords['plon']
@@ -134,6 +136,11 @@ def test_model(config, years):
     test_files = [x for x in increment_files if any(x.find(str(y)) != -1 for y in years)]
     successful_files = []
     successful_dates = []
+
+    # Only to simulate multiple z-layers as a batch
+    sim_z_layers = 41
+    new_x = np.zeros((sim_z_layers, 384, 520, 7), dtype=np.float16)
+
     for id_file, c_file in enumerate(test_files):
         # Find current and next date
         sp_name = c_file.split("/")[-1].split(".")[1]
@@ -155,7 +162,7 @@ def test_model(config, years):
             input_fields_obs = read_netcdf_xr(obs_file_name, obs_field_names, z_layers)
             output_field_increment = read_hycom_fields(increment_file_name, output_fields, z_layers)
         except Exception as e:
-            print(F"Couldn't find all files for date {c_day_str}")
+            print(F"Couldn't find all files for date {c_day_str}: {input_folder_background}, {input_folder_increment}")
             continue
         # ******************* Normalizing and Cropping Data *******************
         this_file_times = []
@@ -192,20 +199,34 @@ def test_model(config, years):
                 print(F"{s_row}:{s_row+rows}, {s_col}:{s_col+cols}")
                 X = np.expand_dims(input_data[s_row:s_row+rows, s_col:s_col+cols,:], axis=0)
                 Y = np.expand_dims(y_data[s_row:s_row+rows, s_col:s_col+cols,:], axis=0)
+                X = X.astype(np.float16)
+                Y = Y.astype(np.float16)
 
                 #=====================  Make the prediction of the network =======================
                 # --------------- DELETE THIS JUST FOR TESTING TIME TO PREDICT ALL THE 30 LEVELS----------------
-                # new_x = np.zeros((30, 384, 520, 5))
-                # for i in range(30):
-                    # new_x[i,:,:,:] = X
-                    # output_nn_original_multiple = model.predict(new_x, verbose=1)
-                    # output_nn_original = output_nn_original_multiple[1,:,:,:]
-                    # output_nn_original = np.reshape(output_nn_original, (1, 384, 520, 1))
-                # --------------- DELETE THIS JUST FOR TESTING TIME TO PREDICT ALL THE 30 LEVELS----------------
+                for i in range(sim_z_layers):
+                    new_x[i,:,:,:] = X
+
+                tensor = tf.convert_to_tensor(new_x)
+                # Place the tensor on the GPU
+                with tf.device('/GPU:0'):
+                    gpu_tensor = tf.identity(tensor)
+
                 start = time.time()
-                output_nn_original = model.predict(X, verbose=1)
+                output_nn_original_multiple = model.predict(gpu_tensor)
                 toc = time.time() - start
+                # Print current time: 
+                print(F"Time to predict all the {sim_z_layers} levels: {toc:0.4f} seconds")
+
                 this_file_times.append(toc)
+
+                if id_file == 0:  # REMOVE THIS IF FOR NORMAL RUN
+                    output_nn_original = model.predict(X)
+                # --------------- DELETE THIS JUST FOR TESTING TIME TO PREDICT ALL THE 30 LEVELS----------------
+                # start = time.time()
+                # output_nn_original = model.predict(X)
+                # toc = time.time() - start
+                # this_file_times.append(toc)
 
                 # Make nan all values inside the land
                 land_indexes = Y == -0.5
@@ -431,7 +452,7 @@ def verifyBoundaries(start_col, cols, tot_cols):
 if __name__ == '__main__':
 
     config = get_prediction_params()
-    years = [2002, 2006]  # Which years to evaluate the model
+    years = [2010]  # Which years to evaluate the model
     # -------- For single model testing (not easy to test because everything must be defined in MainConfig_2D.py)--------------
     # print("Testing single model....")
     # test_model(config)
@@ -487,3 +508,4 @@ if __name__ == '__main__':
         run_name = model["Path"].replace("/models","").split("/")[-1]  # The runname
         config[TrainingParams.config_name] = run_name
         test_model(config, years)
+# %%
