@@ -120,7 +120,8 @@ def test_model(config, years):
 
     start_test_idx = 576+73
 
-    coords_file = "/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/topo/regional.grid.a"
+    # coords_file = "/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/topo/regional.grid.a"
+    coords_file = "/nexsan/people/abozec/TSIS/GOMb0.04/topo/regional.grid.a"
     print(F"The coords available are: {read_field_names(coords_file)}")
     coords = read_hycom_coords(coords_file, ['plon:', 'plat:'])
     lons = coords['plon']
@@ -438,9 +439,8 @@ if __name__ == '__main__':
 
     # -------- For all summary model testing --------------
     print("Testing all the models inside summary.csv ....")
-    # summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/summary.csv"
-    summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/Summary_Only_Best.csv"
-    # summary_file = "/home/olmozavala/DAN_HYCOM/OUTPUT/SUMMARY/summary.csv"
+    # summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/Summary_Only_Best.csv"
+    summary_file = "/unity/f1/ozavala/DATA/NN_HYCOM_TSIS/SUMMARY/Summary_Only_Best.csv"
     df = pd.read_csv(summary_file)
 
     for model_id in range(len(df)):

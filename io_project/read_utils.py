@@ -295,7 +295,8 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
             sst_bias = np.nanmean(modelsst - obssst)
             temp_data = obssst - modelsst + sst_bias
         elif c_field == "topo":
-            file_topo = "/data/HYCOM/DA_HYCOM_TSIS/Topography/gridinfo.nc"
+            # file_topo = "/data/HYCOM/DA_HYCOM_TSIS/Topography/gridinfo.nc"
+            file_topo = "/unity/f1/ozavala/DATA/NN_HYCOM_TSIS/Topography/gridinfo.nc"
             topo_ds = xr.open_dataset(file_topo)
             depth_topo = topo_ds['mdepth']
             depth_mask = depth_topo > 100  # Depth we want to consider

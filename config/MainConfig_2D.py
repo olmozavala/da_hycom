@@ -13,7 +13,9 @@ from ai_common.constants.AI_params import TrainingParams, ModelParams, AiModels
 _run_name = F'RUN_GoM2D_STDNORM_PERCOCEAN_NETWORK_ININ_OBSIN_No-STD_OUTPUT_ROWSxCOLS'  # No-STD means not adding the VARIANCE from the model TSIS remember?
 # _run_name = F'0002_GoM2D_STDNORM_PERCOCEAN_0_NET_2DUNET_srfhgt_ssh-ssh-err-sst-sst-err_No-STD_OUT_SRFHGT_384x520'  # Best run 2022
 
-_output_folder = '/data/HYCOM/DA_HYCOM_TSIS/'  # Where to save everything
+# _output_folder = '/data/HYCOM/DA_HYCOM_TSIS/'  # Where to save everything
+_output_folder = '/unity/f1/ozavala/DATA/NN_HYCOM_TSIS/'  # Where to save everything
+
 # _output_folder = '/home/olmozavala/DAN_HYCOM/OUTPUT/'
 _preproc_folder = "/data/HYCOM/DA_HYCOM_TSIS/preproc"
 
@@ -63,8 +65,8 @@ def appendFields(cur_config):
 
 def get_training():
     cur_config = {
-        # TrainingParams.output_folder: F"{join(_output_folder,'Training')}",
-        TrainingParams.output_folder: F"{join(_output_folder,'TrainingPaper')}",
+        TrainingParams.output_folder: F"{join(_output_folder,'TrainingSkynet')}",
+        # TrainingParams.output_folder: F"{join(_output_folder,'TrainingPaper')}",
         TrainingParams.validation_percentage: .1,
         TrainingParams.test_percentage: .1,
         TrainingParams.file_name: 'RESULTS.csv',

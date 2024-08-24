@@ -5,7 +5,8 @@ from datetime import datetime,timedelta
 import os, sys
 # Common
 sys.path.append("eoas_pyutils/")
-sys.path.append("hycom_utils/python")
+sys.path.append("eoas_pyutils/hycom_utils/python")
+
 from viz_utils.eoa_viz import EOAImageVisualizer
 from io_utils.io_netcdf import read_netcdf, read_netcdf_xr
 from hycom.io import read_hycom_fields
@@ -32,7 +33,10 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
     perc_ocean = config[ProjTrainingParams.perc_ocean]
 
     # --------- Reading all file names --------------
-    increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) if x.endswith('.a')])
+    # increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) if x.endswith('.a') if x.find('001_18') == -1])
+    # Reading only 2009 and 2010
+    increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) 
+                                if x.endswith('.a') and x.find('001_18') == -1 and (x.find('2009') != -1 or x.find('2010') != -1)])
     increment_files.sort()
     increment_files = increment_files[ids]  # Just reading the desired ids
 

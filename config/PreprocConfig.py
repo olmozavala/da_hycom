@@ -10,16 +10,16 @@ def get_preproc_config():
     model_config = {
         # PreprocParams.input_folder_hycom: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies',
         # PreprocParams.input_folder_hycom: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.0/data',
-        PreprocParams.input_folder_hycom: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/data',
+        PreprocParams.input_folder_hycom: '/nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/data',
         # PreprocParams.input_folder_hycom: '/nexsan/archive/dvoss/TSIS/GOMb0.04/expt_02.2/data',
 
         # PreprocParams.input_folder_tsis: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies/incup/',
         # PreprocParams.input_folder_tsis: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.0/incup',
-        PreprocParams.input_folder_tsis: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/incup',
+        PreprocParams.input_folder_tsis: '/nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/incup',
         # PreprocParams.input_folder_tsis: '/nexsan/archive/dvoss/TSIS/GOMb0.04/expt_02.2/incup',
 
         # PreprocParams.input_folder_obs: '/data/COAPS_nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES',
-        PreprocParams.input_folder_obs: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/obs/qcobs_roif',
+        PreprocParams.input_folder_obs: '/nexsan/people/abozec/TSIS/GOMb0.04/obs/qcobs_roif',
         # PreprocParams.input_folder_obs: '/data/HYCOM/DA_HYCOM_TSIS/RAW_2021/OBS',
 
         PreprocParams.output_folder: join(_output_folder, 'preproctest'),
