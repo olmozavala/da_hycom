@@ -1,18 +1,17 @@
-from info.info_hycom import read_field_names
 import cmocean
-from inout.io_hycom import read_hycom_fields, sub_var2
-from inout.io_netcdf import read_netcdf, read_netcdf_xr
-from img_viz.eoa_viz import EOAImageVisualizer
-from img_viz.constants import PlotMode
-from preproc.UtilsDates import get_days_from_month
-from preproc.metrics import mse
+import sys
+sys.path.append('eoas_pyutils')
+sys.path.append('eoas_pyutils/hycom_utils/python')
+from hycom.io import read_hycom_fields, read_field_names, read_hycom_coords
+from io_utils.io_netcdf import read_netcdf, read_netcdf_xr
+from viz_utils.eoa_viz import EOAImageVisualizer, BackgroundType
+from io_utils.dates_utils import get_days_from_month, get_day_of_year_from_month_and_day
 from io_project.read_utils import *
 import re
 import numpy as np
 from multiprocessing import Pool
 from constants_proj.AI_proj_params import PreprocParams, ParallelParams
 from config.PreprocConfig import get_preproc_config
-from preproc.UtilsDates import get_day_of_year_from_month_and_day
 from sklearn.metrics import mean_squared_error
 from scipy.ndimage import convolve, gaussian_filter
 import matplotlib.pyplot as plt
@@ -21,7 +20,6 @@ import xarray as xr
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-import cartopy
 
 NUM_PROC = 1
 
@@ -44,7 +42,6 @@ def plot_raw_data_new(proc_id):
     plot_modes = config[PreprocParams.plot_modes_per_field]
     layers = config[PreprocParams.layers_to_plot]
 
-    img_viz = EOAImageVisualizer(output_folder=output_folder, disp_images=False)
 
     # Iterate current year
     for c_year in YEARS:
@@ -103,9 +100,18 @@ def plot_raw_data_new(proc_id):
                     idm4 = first_field.shape[2]
                     jdm4 = first_field.shape[1]
 
-                    grid_file = "/data/HYCOM/DA_HYCOM_TSIS/Topography/regional.grid.a"
-                    dx4 = sub_var2(grid_file,idm4,jdm4,10)  #  dx in meters
-                    dy4 = sub_var2(grid_file,idm4,jdm4,11)
+                    grid_file = "/nexsan/people/abozec/TSIS/GOMb0.04/topo/regional.grid.a"
+                    grid_vars = read_field_names(grid_file)
+                    grid_fields = read_hycom_coords(grid_file, ['plat', 'plon'])
+                    lats = grid_fields['plat'][:,0]
+                    lons = grid_fields['plon'][0,:]
+                    # If img_viz is undefined then create it
+                    if 'img_viz' not in locals():
+                        img_viz = EOAImageVisualizer(output_folder=output_folder, disp_images=False, 
+                                                     background=BackgroundType.WHITE, show_var_names=True,
+                                                     lats = lats, lons = lons)
+                    # dx4 = sub_var2(grid_file,idm4,jdm4,10)  #  dx in meters
+                    # dy4 = sub_var2(grid_file,idm4,jdm4,11)
 
                     # obs_np_fields = read_netcdf(obs_paths[obs_file_idx], fields_obs, rename_fields=fields)
                     obs_np_fields = read_netcdf_xr(obs_paths[obs_file_idx], fields_obs)
@@ -154,21 +160,21 @@ def plot_raw_data_new(proc_id):
                         # Computing the increment
                         inc = (increment_np_c_field - model_state_np_c_field)
 
+
                         # ======================= Only Background state and TSIS increment ==================
                         # try:
                         #     title = F"{c_field_name} {c_year}_{c_month:02d}_{(c_day_of_month+1):02d}"
                         #     img_viz.plot_3d_data_np([model_state_np_c_field, inc],
                         #     # img_viz.plot_3d_data_np([model_state_np_c_field, increment_np_c_field],
                         #                             var_names=['HYCOM', 'Increment (TSIS)'],
-                        #                             title=title, file_name_prefix=F'ModelAndIncrement_{c_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
+                        #                             title=title, file_name_prefix=F'ModelAndIncrement_{c_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_levels=layers,
                         #                             flip_data=True, plot_mode=plot_modes[idx_field], maxcbar=maxcbar, mincbar=mincbar)
                         # except Exception as e:
                         #     print(F"Failed for field: {c_field_name}: {e}")
 
                         # # ======================= Only OBS, HYCOM, OBS-HYCOM, INC,  ==================
                         c_obs_field_name = fields_obs[idx_field]
-                        # title = F"{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}"
-                        title = F"{(c_day_of_month+1):02d}"
+                        title = F"{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}"
                         obs_np_c_field = obs_np_fields[c_obs_field_name]
 
                         # Put the observations in the same range than the background (remove bias)
@@ -205,7 +211,7 @@ def plot_raw_data_new(proc_id):
                         # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, inc],
                         # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, np.expand_dims(diff,0), inc],
                         #                         var_names=[F'Obs', 'HYCOM', 'OBS-HYCOM', 'INC'],
-                        #                         title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
+                        #                         title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_levels=layers,
                         #                         flip_data=True, plot_mode=plot_modes[idx_field])
 
 
@@ -218,14 +224,15 @@ def plot_raw_data_new(proc_id):
 
                         img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, np.expand_dims(diff,0), inc, t],
                                                 var_names=[F'Obs', 'HYCOM', 'OBS-HYCOM', 'INC', "INC + DIFF"],
-                                                title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
+                                                title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', 
+                                                z_levels=layers,
                                                 cmap=cmocean.cm.curl,
-                                                maxcbar=[maxcbar, maxcbar, maxcbar, maxcbar, maxcbar],
-                                                mincbar=[mincbar, mincbar, mincbar, mincbar, mincbar],
-                                                flip_data=True, plot_mode=plot_modes[idx_field])
+                                                # maxcbar=[maxcbar, maxcbar, maxcbar, maxcbar, maxcbar],
+                                                # mincbar=[mincbar, mincbar, mincbar, mincbar, mincbar],
+                                                flip_data=False, plot_mode=plot_modes[idx_field])
                         # img_viz.plot_3d_data_np([inc, t],
                         #                         var_names=['INC', "INC + DIFF"],
-                        #                         title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
+                        #                         title=title, file_name_prefix=F'ObservationsModelIncrement_{c_obs_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_levels=layers,
                         #                         cmap=cmocean.cm.curl,
                         #                         maxcbar=[maxcbar for x in range(2)],
                         #                         mincbar=[mincbar for x in range(2)],
@@ -310,7 +317,7 @@ def plot_raw_data(proc_id):
                         # ======================= Only Free HYCOM, TSIS, Observations ==================
                         img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, increment_np_c_field],
                                                 var_names=[F'Observations', 'HYCOM', 'Increment (TSIS)'],
-                                                title=title, file_name_prefix=F'Summary_{c_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_lavels_names=layers,
+                                                title=title, file_name_prefix=F'Summary_{c_field_name}_{c_year}_{c_month:02d}_{(c_day_of_month+1):02d}', z_levels=layers,
                                                 flip_data=True, plot_mode=plot_modes[idx_field])
 
                         # img_viz.plot_3d_data_np([np.expand_dims(obs_np_c_field, 0), model_state_np_c_field, increment_np_c_field,
@@ -318,13 +325,13 @@ def plot_raw_data(proc_id):
                         #                         var_names=['Obs', 'HYCOM', 'DA', F'DA-Forecast (mse:{mse_hycom_vs_da:.3f})',
                         #                                    F'Obs-Hycom (mse:{mse_obs_vs_hycom:.3f})',
                         #                                    F'Obs-DA (mse:{mse_obs_vs_da:.3f})'],
-                        #                         title=title, file_name_prefix=F'{c_field_name}_{c_year}_{c_month:02d}_{c_day_of_month:02d}', z_lavels_names=layers,
+                        #                         title=title, file_name_prefix=F'{c_field_name}_{c_year}_{c_month:02d}_{c_day_of_month:02d}', z_levels=layers,
                         #                         flip_data=True, plot_mode=plot_modes[idx_field])
 
                         # ======================= Only Free HYCOM, TSIS assimilated and the difference ==================
                         # img_viz.plot_3d_data_np([model_state_np_c_field, increment_np_c_field, diff_increment_vs_fo],
                         #                         var_names=['Free', 'TSIS', F'TSIS-Free'],
-                        #                         title=title, file_name_prefix=F'0_{c_field_name}_{c_year}_{c_month:02d}_{c_day_of_month:02d}', z_lavels_names=layers,
+                        #                         title=title, file_name_prefix=F'0_{c_field_name}_{c_year}_{c_month:02d}_{c_day_of_month:02d}', z_levels=layers,
                         #                         flip_data=True, plot_mode=plot_modes[idx_field])
 
 def compute_consecutive_days_difference():
@@ -445,7 +452,7 @@ def img_generation_hycom(proc_id):
                         # ======================= Only Fredatae HYCOM, TSIS, Observations ==================
                         img_viz.plot_3d_data_np([model_state_np_c_field],
                                                 var_names=[F'HYCOM'],
-                                                title=title, file_name_prefix=F'HYCOM_{c_field_name}_{c_year}_{c_month:02d}_{c_day_of_month:02d}', z_lavels_names=layers,
+                                                title=title, file_name_prefix=F'HYCOM_{c_field_name}_{c_year}_{c_month:02d}_{c_day_of_month:02d}', z_levels=layers,
                                                 flip_data=True, plot_mode=plot_modes[idx_field])
 
 def MSE():
@@ -645,5 +652,3 @@ if __name__ == '__main__':
     #     plt.title(c_var_name)
     #     plt.show()
     #     x = 1
-
-

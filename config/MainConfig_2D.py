@@ -14,15 +14,14 @@ _run_name = F'RUN_GoM2D_STDNORM_PERCOCEAN_NETWORK_ININ_OBSIN_No-STD_OUTPUT_ROWSx
 # _run_name = F'0002_GoM2D_STDNORM_PERCOCEAN_0_NET_2DUNET_srfhgt_ssh-ssh-err-sst-sst-err_No-STD_OUT_SRFHGT_384x520'  # Best run 2022
 
 # _output_folder = '/data/HYCOM/DA_HYCOM_TSIS/'  # Where to save everything
-_output_folder = '/unity/f1/ozavala/DATA/NN_HYCOM_TSIS/'  # Where to save everything
+_output_folder = '/unity/f1/ozavala/OUTPUTS/DA_HYCOM_TSIS/TrainingSkynetPaperReviews' # Where to save everything
 
-# _output_folder = '/home/olmozavala/DAN_HYCOM/OUTPUT/'
-_preproc_folder = "/data/HYCOM/DA_HYCOM_TSIS/preproc"
+_preproc_folder = '/unity/f1/ozavala/OUTPUTS//DA_HYCOM_TSIS/preproc'
 
 # _preproc_folder = '/home/data/MURI/preproc'
 # _output_folder = '/home/data/MURI/output'
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Decide which GPU to use to execute the code
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Decide which GPU to use to execute the code
 # tf.config.experimental.VirtualDeviceConfiguration(memory_limit=12288)
 # tf.config.experimental.VirtualDeviceConfiguration(memory_limit=2000)
 
@@ -66,7 +65,6 @@ def appendFields(cur_config):
 def get_training():
     cur_config = {
         TrainingParams.output_folder: F"{join(_output_folder,'TrainingSkynet')}",
-        # TrainingParams.output_folder: F"{join(_output_folder,'TrainingPaper')}",
         TrainingParams.validation_percentage: .1,
         TrainingParams.test_percentage: .1,
         TrainingParams.file_name: 'RESULTS.csv',
@@ -76,12 +74,12 @@ def get_training():
         # TrainingParams.evaluation_metrics: [losses.mse],  # Metrics to show in tensor flow in the training
         # TrainingParams.loss_function: losses.mse,  # Loss function to use for the learning
 
-        TrainingParams.optimizer: Adam(lr=0.001),  # Default values lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None,
+        TrainingParams.optimizer: Adam(learning_rate=0.001),  # Default values lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None,
         TrainingParams.batch_size: 10, # READ In this case it is not a common batch size. It indicates the number of images to read from the same file
         TrainingParams.epochs: 5000,
         TrainingParams.config_name: _run_name,
         TrainingParams.data_augmentation: False,
-        ProjTrainingParams.input_folder_preproc: '/data/HYCOM/DA_HYCOM_TSIS/preproc',
+        ProjTrainingParams.input_folder_preproc: '/unity/f1/ozavala/OUTPUTS//DA_HYCOM_TSIS/',
         ProjTrainingParams.output_folder: join(_output_folder, 'images'),
         ProjTrainingParams.YEARS: [2009],
         ProjTrainingParams.MONTHS: range(1, 13),

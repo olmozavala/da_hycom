@@ -33,10 +33,10 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
     perc_ocean = config[ProjTrainingParams.perc_ocean]
 
     # --------- Reading all file names --------------
-    # increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) if x.endswith('.a') if x.find('001_18') == -1])
+    increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) if x.endswith('.a') if x.find('001_18') == -1])
     # Reading only 2009 and 2010
-    increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) 
-                                if x.endswith('.a') and x.find('001_18') == -1 and (x.find('2009') != -1 or x.find('2010') != -1)])
+    # increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) 
+                                # if x.endswith('.a') and x.find('001_18') == -1 and (x.find('2009') != -1 or x.find('2010') != -1)])
     increment_files.sort()
     increment_files = increment_files[ids]  # Just reading the desired ids
 
@@ -78,7 +78,7 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
     #     input_fields_var = read_netcdf(var_file, var_field_names, z_layers)
     # else:
     #     input_fields_var = []
-    #
+    
     while True:
         # These lines are for sequential selection
         if ex_id < (len(ids) - 1): # We are not supporting batch processing right now
@@ -138,19 +138,19 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
                 # X[0,:,:,2] = gaussian_filter(X[0,:,:,2], 2)
                 # X[0,:,:,3] = gaussian_filter(X[0,:,:,3], 2)
 
-                viz_obj = EOAImageVisualizer(output_folder=join(output_folder, "training_imgs"), disp_images=False)
-                viz_obj.plot_2d_data_np(np.rollaxis(X[0,:,:,:],2,0),
-                                            var_names=[F"in_model_{x}" for x in field_names+composite_field_names] +
-                                                      [F"in_obs_{x}" for x in obs_field_names],
-                                            cmap=[cmocean.cm.thermal, cmocean.cm.curl,cmocean.cm.curl,cmocean.cm.thermal,cmocean.cm.curl],
-                                            # cmap=cmocean.cm.curl,
-                                            file_name_prefix=F"{c_id}_{start_col}_{start_row}",
-                                            title=F"")
+                # viz_obj = EOAImageVisualizer(output_folder=join(output_folder, "training_imgs"), disp_images=False)
+                # viz_obj.plot_2d_data_np(np.rollaxis(X[0,:,:,:],2,0),
+                #                             var_names=[F"in_model_{x}" for x in field_names+composite_field_names] +
+                #                                       [F"in_obs_{x}" for x in obs_field_names],
+                #                             cmap=[cmocean.cm.thermal, cmocean.cm.curl,cmocean.cm.curl,cmocean.cm.thermal,cmocean.cm.curl],
+                #                             # cmap=cmocean.cm.curl,
+                #                             file_name_prefix=F"{c_id}_{start_col}_{start_row}",
+                #                             title=F"")
 
-                viz_obj.plot_2d_data_np(np.rollaxis(Y[0,:,:,:],2,0),
-                                        var_names=[F"out_model_{x}" for x in output_fields] ,
-                                        file_name_prefix=F"{c_id}_{start_col}_{start_row}_out",
-                                        title=F"{increment_file_name}")
+                # viz_obj.plot_2d_data_np(np.rollaxis(Y[0,:,:,:],2,0),
+                #                         var_names=[F"out_model_{x}" for x in output_fields] ,
+                #                         file_name_prefix=F"{c_id}_{start_col}_{start_row}_out",
+                #                         title=F"{increment_file_name}")
 
                 yield X, Y
                 # yield [np.zeros((1, 384, 520, 24, 8))], [np.zeros((1, 384, 520, 24, 6))]

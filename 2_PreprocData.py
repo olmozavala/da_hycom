@@ -5,6 +5,7 @@ sys.path.append("eoas_pyutils/hycom_utils/python")
 from hycom.io import read_hycom_fields, read_hycom_coords, read_field_names
 from datetime import datetime
 from io_utils.io_netcdf import read_netcdf
+from io_utils.io_common import create_folder
 from viz_utils.eoa_viz import EOAImageVisualizer
 from viz_utils.eoa_viz import PlotMode
 from io_utils.dates_utils import get_days_from_month
@@ -18,7 +19,7 @@ from constants_proj.AI_proj_params import PreprocParams, ParallelParams
 from config.PreprocConfig import get_preproc_config
 
 # Not sure how to move this inside the function
-NUM_PROC = 1
+NUM_PROC =  None # Set bellow
 
 _minlat = 7.00250
 _minlon = -98.08
@@ -26,7 +27,7 @@ _maxlat = 31.9267
 _maxlon = -56.08
 
 # # Here we identify lat and lons before hand. TODO improve this making it local to functions
-coords_file =  "/data/HYCOM/DA_HYCOM_TSIS/Topography/regional.grid.a"
+coords_file = "/nexsan/people/abozec/TSIS/GOMb0.04/topo/regional.grid.a"
 # coord_fields = [ 'plon','plat','qlon','qlat','ulon','ulat','vlon','vlat']
 coord_fields = ['plon','plat']
 print("Reading hycom coordinates....")
@@ -37,6 +38,7 @@ print("Done!")
 
 def preproc_data(proc_id):
     """
+    The paralellization is done by days. Each process will process a different day of the month (up to 30).
     This function preprocess the desired data. It does the following:
         1) Looks for dates where there is 'increment', model, and observations data.
         2) Saves the files on the same folder with only the 'desired' fields in netcdf format
@@ -56,6 +58,10 @@ def preproc_data(proc_id):
     layers = config[PreprocParams.layers_to_plot]
     img_viz = EOAImageVisualizer(output_folder=output_folder, disp_images=False)
 
+    # Create folder form io_utils.io_common
+    create_folder(output_folder)
+
+
     # These are the data assimilated files
     for c_year in YEARS:
         for c_month in MONTHS:
@@ -71,11 +77,11 @@ def preproc_data(proc_id):
                 if (c_day_of_month % NUM_PROC) == proc_id:
                     re_increment = F'incupd.{c_year}_{c_day_of_year:03d}\S*.a'
                     re_model = F'archv.{c_year}_{c_day_of_year:03d}\S*.a'
-                    re_obs = F'tsis_obs_ias_{c_year}{c_month:02d}{c_day_of_month+1:02d}\S*.nc'
+                    re_obs = F'tsis_obs_gomb4_{c_year}{c_month:02d}{c_day_of_month+1:02d}\S*.nc'
 
                     try:
                         da_file_idx = [i for i, file in enumerate(da_files) if re.search(re_increment, file) != None][0]
-                        print(F" =============== Working with: {da_files[da_file_idx]} Proc_id={proc_id} ============= ")
+                        print(F" =============== Working with (hycom) : {da_files[da_file_idx]} Proc_id={proc_id} ============= ")
                         da_np_fields = read_hycom_fields(da_paths[da_file_idx], fields, layers=layers)
 
                         hycom_file_idx = [i for i, file in enumerate(hycom_files) if re.search(re_model, file) != None][0]
@@ -90,7 +96,7 @@ def preproc_data(proc_id):
                         continue
 
                     try:
-                        print(F" --------------- Working with: {hycom_files[hycom_file_idx]} ------------- ")
+                        print(F" --------------- Working with (increment): {hycom_files[hycom_file_idx]} ------------- ")
                         hycom_file_idx = [i for i, file in enumerate(hycom_files) if re.search(re_model, file) != None][0]
                         hycom_np_fields = read_hycom_fields(hycom_paths[hycom_file_idx], fields, layers=layers)
                         # --------- Preprocessing HYCOM data -------------
@@ -101,7 +107,7 @@ def preproc_data(proc_id):
                     try:
                         obs_file_idx = [i for i, file in enumerate(obs_files) if re.search(re_obs, file) != None][0]
                         # --------- Preprocessing observed data -------------
-                        print(F" --------------- Working with: {hycom_files[hycom_file_idx]} ------------- ")
+                        print(F" --------------- Working with (obs): {hycom_files[hycom_file_idx]} ------------- ")
                         obs_ds = xr.load_dataset(obs_paths[obs_file_idx])
                         for id_field, c_obs_field in enumerate(obs_fields):
                             if id_field == 0:
@@ -109,29 +115,29 @@ def preproc_data(proc_id):
                             else:
                                 preproc_obs_ds = preproc_obs_ds.merge(obs_ds[c_obs_field].to_dataset())
 
-                        # --------------- Here we add the fields from the profiles as gridded data -----------
-                        temp_group = 0
-                        saln_group = 1
-                        sst_p = np.zeros(preproc_obs_ds[c_obs_field].values.shape)
-                        sss_p = np.zeros(sst_p.shape)
-                        profiles = obs_ds.val
-                        tot_profiles = profiles.shape[0]
-                        obs_groups = obs_ds.ob_grp_present
+                        # --------------- Here we add the fields from the profiles (PIEAS) as gridded data -----------
+                        # temp_group = 0
+                        # saln_group = 1
+                        # sst_p = np.zeros(preproc_obs_ds[c_obs_field].values.shape)
+                        # sss_p = np.zeros(sst_p.shape)
+                        # profiles = obs_ds.val
+                        # tot_profiles = profiles.shape[0]
+                        # obs_groups = obs_ds.ob_grp_present
 
-                        lons_i = obs_ds.grdi.values[:, 0, 0]
-                        lats_i = obs_ds.grdj.values[:, 0, 0]
-                        for i_group, c_type in enumerate(obs_groups):
-                            if c_type == saln_group or c_type == temp_group:
-                                for c_profile_i in range(tot_profiles):
-                                    c_data = profiles[c_profile_i, -1, i_group]
-                                    if c_type == saln_group:
-                                        sss_p[int(lats_i[c_profile_i]), int(lons_i[c_profile_i])] = c_data
-                                    if c_type == temp_group:
-                                        sst_p[int(lats_i[c_profile_i]), int(lons_i[c_profile_i])] = c_data
-                        print(F"Max value: {np.amax(sst_p)}")
-                        print(F"Max value s: {np.amax(sss_p)}")
-                        preproc_obs_ds['sst_p'] = xr.DataArray(sst_p, dims=['yc', 'xc'])
-                        preproc_obs_ds['sss_p'] = xr.DataArray(sss_p, dims=['yc', 'xc'])
+                        # lons_i = obs_ds.grdi.values[:, 0, 0]
+                        # lats_i = obs_ds.grdj.values[:, 0, 0]
+                        # for i_group, c_type in enumerate(obs_groups):
+                        #     if c_type == saln_group or c_type == temp_group:
+                        #         for c_profile_i in range(tot_profiles):
+                        #             c_data = profiles[c_profile_i, -1, i_group]
+                        #             if c_type == saln_group:
+                        #                 sss_p[int(lats_i[c_profile_i]), int(lons_i[c_profile_i])] = c_data
+                        #             if c_type == temp_group:
+                        #                 sst_p[int(lats_i[c_profile_i]), int(lons_i[c_profile_i])] = c_data
+                        # print(F"Max value: {np.amax(sst_p)}")
+                        # print(F"Max value s: {np.amax(sss_p)}")
+                        # preproc_obs_ds['sst_p'] = xr.DataArray(sst_p, dims=['yc', 'xc'])
+                        # preproc_obs_ds['sss_p'] = xr.DataArray(sss_p, dims=['yc', 'xc'])
                         preproc_obs_ds.to_netcdf(join(output_folder, F"obs_{c_year}_{c_day_of_year:03d}.nc"))
                     except Exception as e:
                         print(F"Warning: OBS file for date {c_year}-{c_month}-{c_day_of_month} doesn't exist: {e}")
@@ -200,7 +206,8 @@ def proc_model_data(np_fields, field_names, file_name):
 
 
 if __name__ == '__main__':
+    NUM_PROC = 30
     # ----------- Parallel -------
-    # p = Pool(NUM_PROC)
-    # p.map(preproc_data, range(NUM_PROC))
-    preproc_data(0)
+    p = Pool(NUM_PROC)
+    p.map(preproc_data, range(NUM_PROC))
+    # preproc_data(0)

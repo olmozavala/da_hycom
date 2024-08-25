@@ -1,4 +1,9 @@
 # External
+import sys
+sys.path.append("eoas_pyutils")
+sys.path.append('eoas_pyutils/hycom_utils/python')
+
+import multiprocessing
 from datetime import datetime, timedelta
 from pandas import DataFrame
 from config.MainConfig_2D import get_training
@@ -22,6 +27,7 @@ from os.path import join
 import numpy as np
 import os
 
+import  tensorflow as tf
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras.layers import LeakyReLU
 
@@ -134,7 +140,7 @@ def doTraining(config):
     generator_val = data_gen_from_raw(config, preproc_config, val_ids, fields, fields_obs, output_fields,
                                       examples_per_figure=1, perc_ocean=0, composite_field_names=fields_comp)
 
-    model.fit_generator(generator_train, steps_per_epoch=min(1000, len(train_ids)),
+    model.fit(generator_train, steps_per_epoch=min(1000, len(train_ids)),
                         validation_data=generator_val,
                         # validation_steps=min(100, len(val_ids)),
                         validation_steps=100,
@@ -213,7 +219,10 @@ def get_defaults():
 
 if __name__ == '__main__':
     orig_config = get_training()
-    # Single training
+
+    # # ====================================================================
+    # # ====================== Single training ==========================
+    # # ====================================================================
     # doTraining(orig_config)
 
     # # ====================================================================
@@ -225,10 +234,10 @@ if __name__ == '__main__':
     N = 5  # How many networks we want to run for each experiment
 
     # ========== NN With best results =================
-    print(" --------------- Multiple runs of best network -------------------")
-    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    output_fields = [['srfhgt']]
-    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    # print(" --------------- Multiple runs of best network -------------------")
+    # bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+    # output_fields = [['srfhgt']]
+    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
 
     # ========== Testing Types of NN options =================
     print(" --------------- Testing different NN selections -------------------")

@@ -1,30 +1,33 @@
 from os.path import join
-from constants_proj.AI_proj_params import *
-from eoas_pyutils.viz_utils.constants import PlotMode
+from constants_proj.AI_proj_params import PreprocParams
+from viz_utils.constants import PlotMode
 import numpy as np
 
 # ----------------------------- UM -----------------------------------
-_output_folder = '/data/HYCOM/DA_HYCOM_TSIS/'  # ONLY FOR PREPROC check MainConfig2D.py for training
+_output_folder = '/unity/f1/ozavala/OUTPUTS//DA_HYCOM_TSIS/'  # ONLY FOR PREPROC check MainConfig2D.py for training
 
 def get_preproc_config():
     model_config = {
         # PreprocParams.input_folder_hycom: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies',
         # PreprocParams.input_folder_hycom: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.0/data',
+        # This Hycom is is from (2002 to 2010)
         PreprocParams.input_folder_hycom: '/nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/data',
         # PreprocParams.input_folder_hycom: '/nexsan/archive/dvoss/TSIS/GOMb0.04/expt_02.2/data',
 
         # PreprocParams.input_folder_tsis: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies/incup/',
         # PreprocParams.input_folder_tsis: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.0/incup',
+        # Increments are from (2002 to 2010)
         PreprocParams.input_folder_tsis: '/nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/incup',
         # PreprocParams.input_folder_tsis: '/nexsan/archive/dvoss/TSIS/GOMb0.04/expt_02.2/incup',
 
         # PreprocParams.input_folder_obs: '/data/COAPS_nexsan/people/abozec/TSIS/IASx0.03/obs/qcobs_mdt_gofs/WITH_PIES',
+        # Obs are from 2001 to 2023
         PreprocParams.input_folder_obs: '/nexsan/people/abozec/TSIS/GOMb0.04/obs/qcobs_roif',
         # PreprocParams.input_folder_obs: '/data/HYCOM/DA_HYCOM_TSIS/RAW_2021/OBS',
 
-        PreprocParams.output_folder: join(_output_folder, 'preproctest'),
+        PreprocParams.output_folder: join(_output_folder, 'preproc'),
         PreprocParams.imgs_output_folder: join(_output_folder, 'preproc', 'imgs'),
-        PreprocParams.YEARS: [2009],
+        PreprocParams.YEARS: range(2002, 2011),
         PreprocParams.MONTHS: range(1, 13),
         # PreprocParams.MONTHS: range(10,13),
 
