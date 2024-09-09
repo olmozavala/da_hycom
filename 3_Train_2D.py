@@ -30,8 +30,11 @@ import os
 import  tensorflow as tf
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras.layers import LeakyReLU
+from tensorflow.keras.optimizers import Adam, SGD
+
 
 def doTraining(config):
+
     preproc_config = get_preproc_config()
     input_folder_increment =    preproc_config[PreprocParams.input_folder_tsis]
 
@@ -63,7 +66,9 @@ def doTraining(config):
 
     # Compute how many cases
     all_increment_files = os.listdir(input_folder_increment)
-    files_to_read = np.array([x for x in all_increment_files if x.find(".a") != -1])
+    # TODO When you modify this one, you need to modify also the GeneratorRaw2D.py
+    files_to_read = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) 
+                                if x.endswith('.a') and x.find('001_18') == -1 and (x.find('2009') != -1 or x.find('2010') != -1)])
     files_to_read.sort()
     # Remove files without data
     rem_days_txt = ["2009/08/31", "2009/09/01", "2010/07/07", "2010/07/08", "2010/07/09", "2010/07/11", "2010/08/23", "2010/11/15"]
@@ -83,9 +88,9 @@ def doTraining(config):
                                                                              test_percentage=test_perc,
                                                                              shuffle_ids=False)
 
-    print(F"Train examples (total:{len(train_ids)}) :{files_to_read[train_ids]}")
-    print(F"Validation examples (total:{len(val_ids)}) :{files_to_read[val_ids]}:")
-    print(F"Test examples (total:{len(test_ids)}) :{files_to_read[test_ids]}")
+    print(F"Train examples (total:{len(train_ids)}) :{files_to_read[train_ids[0:2]]}")
+    print(F"Validation examples (total:{len(val_ids)}) :{files_to_read[val_ids[0:2]]}:")
+    print(F"Test examples (total:{len(test_ids)}) :{files_to_read[test_ids[0:2]]}")
 
     print("Selecting and generating the model....")
     now = datetime.utcnow().strftime("%Y_%m_%d_%H_%M")
@@ -121,7 +126,7 @@ def doTraining(config):
     info_params.to_csv(file_name_input, index=None)
 
     print("Compiling model ...")
-    model.compile(loss=loss_func, optimizer=optimizer, metrics=eval_metrics)
+    model.compile(loss=loss_func, optimizer=Adam(learning_rate=0.0001), metrics=eval_metrics)
 
     print("Getting callbacks ...")
 
@@ -135,24 +140,28 @@ def doTraining(config):
     # # ----------- Using preprocessed data -------------------
     examples_per_figure = config[TrainingParams.batch_size]
     perc_ocean = config[ProjTrainingParams.perc_ocean]
-    generator_train = data_gen_from_raw(config, preproc_config, train_ids, fields, fields_obs, output_fields,
-                                        examples_per_figure=examples_per_figure, perc_ocean=perc_ocean, composite_field_names=fields_comp)
-    generator_val = data_gen_from_raw(config, preproc_config, val_ids, fields, fields_obs, output_fields,
-                                      examples_per_figure=1, perc_ocean=0, composite_field_names=fields_comp)
+    batch_size_train = config[TrainingParams.batch_size]
+    batch_size_val = 20 # The validation batch size is fixed to 20
 
-    model.fit(generator_train, steps_per_epoch=min(1000, len(train_ids)),
+    generator_train = data_gen_from_raw(config, preproc_config, train_ids, fields, fields_obs, output_fields,
+                                        examples_per_figure=examples_per_figure, perc_ocean=perc_ocean, 
+                                        composite_field_names=fields_comp, batch_size=batch_size_train)
+    generator_val = data_gen_from_raw(config, preproc_config, val_ids, fields, fields_obs, output_fields,
+                                      examples_per_figure=1, perc_ocean=0, composite_field_names=fields_comp,
+                                      batch_size=batch_size_val)
+
+    model.fit(generator_train, steps_per_epoch=len(train_ids)//batch_size_train,
                         validation_data=generator_val,
-                        # validation_steps=min(100, len(val_ids)),
-                        validation_steps=100,
+                        validation_steps=3, # Number of batches to use for validation
                         use_multiprocessing=False,
                         workers=1,
                         # validation_freq=10, # How often to compute the validation loss
                         epochs=epochs, callbacks=[logger, save_callback, stop_callback])
 
-def multipleRuns(config, orig_name, start_i, N, bboxes, network_types, network_names,
+def multipleRuns(config, orig_name, run_ids, bboxes, network_types, network_names,
                  perc_ocean, in_fields, obs_in_fields, out_fields, comp_fields):
 
-    for i in range(N):
+    for i in run_ids:
         for j, net_type_id in enumerate(network_types):
             for c_bbox in bboxes:
                 for c_perc_ocean in perc_ocean:
@@ -161,7 +170,7 @@ def multipleRuns(config, orig_name, start_i, N, bboxes, network_types, network_n
                             for c_comp_fields in comp_fields:
                                 for c_in_fields in in_fields:
                                     # Set run value
-                                    local_name = orig_name.replace("RUN", F"{(i+start_i):04d}")
+                                    local_name = orig_name.replace("RUN", F"{(i):04d}")
                                     # Set output fields
                                     out_fields_txt = '_'.join(c_out_fields).upper().replace("_","-")
                                     local_name = local_name.replace("OUTPUT", F"OUT_{out_fields_txt}")
@@ -194,15 +203,15 @@ def multipleRuns(config, orig_name, start_i, N, bboxes, network_types, network_n
                                     local_name = local_name.replace("PERCOCEAN", F"PERCOCEAN_{str(c_perc_ocean).replace('.','')}")
                                     config[ProjTrainingParams.perc_ocean] = c_perc_ocean
 
-                                    # Changing the number of images generated per example to improve speed
-                                    if c_bbox[0] == 80 or c_bbox[0] == 160:
-                                        config[TrainingParams.batch_size] = 10
-                                    else:
-                                        config[TrainingParams.batch_size] = 1
-
                                     print(F"----------------------{local_name}----------------------")
                                     config[TrainingParams.config_name] = local_name
                                     doTraining(config)
+                                    # Reset all tensorflow variables
+                                    tf.keras.backend.clear_session()
+                                    
+    
+    print("All processes finished for these combination of runs!")
+
 
 def get_defaults():
     bboxes = [[384,520]]
@@ -218,6 +227,14 @@ def get_defaults():
     return bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields
 
 if __name__ == '__main__':
+    # Receive start_i from the command line
+    if len(sys.argv) < 2:
+        run_id = 1
+    else:
+        run_id= int(sys.argv[1])
+    print(F"Run id: {run_id}")
+    run_id = [run_id]
+    
     orig_config = get_training()
 
     # # ====================================================================
@@ -230,9 +247,6 @@ if __name__ == '__main__':
     # # ====================================================================
     orig_name = orig_config[TrainingParams.config_name]
 
-    start_i = 1  # When to start (if we already have some runs)
-    N = 5  # How many networks we want to run for each experiment
-
     # ========== NN With best results =================
     # print(" --------------- Multiple runs of best network -------------------")
     # bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
@@ -244,13 +258,13 @@ if __name__ == '__main__':
     bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
     network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
     network_names = ["2DUNET", "SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
-    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
     
     # ========== Testing obs input fields =================
     print(" --------------- Testing different input OBS types -------------------")
     bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
     obs_in_fields = [["ssh", "sst"], ["ssh", "ssh_err", "sst", "sst_err"]]
-    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
     
     # ========== Testing output fields =================
     print(" --------------- Testing different output fields -------------------")
@@ -259,17 +273,17 @@ if __name__ == '__main__':
     obs_in_fields = [["ssh", "sst"]]
     in_fields = [["srfhgt","temp"]]
     comp_fields = [["diff_ssh","topo","diff_sst"]]
-    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
-    
-    # ========== Testing BBOX options =================
-    print(" --------------- Testing different bbox selections -------------------")
-    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    bboxes = [[80,80], [120, 120], [160,160]]
-    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
     
     # ========== Testing perc of oceans =================
     print(" --------------- Testing different Perc ocean -------------------")
     bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
     bboxes = [[160,160]]
     perc_ocean = [.3, .6, .9]
-    multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+
+    # ========== Testing BBOX options =================
+    print(" --------------- Testing different bbox selections -------------------")
+    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+    bboxes = [[80,80], [120, 120], [160,160]]
+    multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)

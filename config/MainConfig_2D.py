@@ -75,7 +75,7 @@ def get_training():
         # TrainingParams.loss_function: losses.mse,  # Loss function to use for the learning
 
         TrainingParams.optimizer: Adam(learning_rate=0.001),  # Default values lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None,
-        TrainingParams.batch_size: 10, # READ In this case it is not a common batch size. It indicates the number of images to read from the same file
+        TrainingParams.batch_size: 30, 
         TrainingParams.epochs: 5000,
         TrainingParams.config_name: _run_name,
         TrainingParams.data_augmentation: False,

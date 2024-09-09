@@ -10,9 +10,7 @@ def get_preproc_config():
     model_config = {
         # PreprocParams.input_folder_hycom: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies',
         # PreprocParams.input_folder_hycom: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.0/data',
-        # This Hycom is is from (2002 to 2010)
-        PreprocParams.input_folder_hycom: '/nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/data',
-        # PreprocParams.input_folder_hycom: '/nexsan/archive/dvoss/TSIS/GOMb0.04/expt_02.2/data',
+        PreprocParams.input_folder_hycom: '/nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/data',  # This Hycom is is from (2002 to 2010)
 
         # PreprocParams.input_folder_tsis: '/data/COAPS_Net/gleam/abozec/HYCOM/TSIS/IASx0.03/hindcast_newtsis/gofs30_withpies/incup/',
         # PreprocParams.input_folder_tsis: '/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.0/incup',
