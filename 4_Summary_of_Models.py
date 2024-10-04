@@ -156,7 +156,9 @@ if __name__ == '__main__':
             if loss < min_loss:
                 min_loss = loss
                 best_model = buildSummary(model, np.around(min_loss,5), join(trained_models_folder, experiment, "models"))
-        summary.append(best_model)
+        # Verify that model object is not an empty dictionary
+        if best_model:
+            summary.append(best_model)
     summary = buildDF(summary)
     print(summary)
 

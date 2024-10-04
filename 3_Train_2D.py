@@ -65,7 +65,7 @@ def doTraining(config):
     create_folder(input_info_folder)
 
     # Compute how many cases
-    all_increment_files = os.listdir(input_folder_increment)
+    # all_increment_files = os.listdir(input_folder_increment)
     # TODO When you modify this one, you need to modify also the GeneratorRaw2D.py
     files_to_read = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) 
                                 if x.endswith('.a') and x.find('001_18') == -1 and (x.find('2009') != -1 or x.find('2010') != -1)])
