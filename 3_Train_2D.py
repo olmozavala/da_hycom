@@ -65,7 +65,7 @@ def doTraining(config):
     create_folder(input_info_folder)
 
     # Compute how many cases
-    # all_increment_files = os.listdir(input_folder_increment)
+    all_increment_files = os.listdir(input_folder_increment)
     # TODO When you modify this one, you need to modify also the GeneratorRaw2D.py
     files_to_read = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) 
                                 if x.endswith('.a') and x.find('001_18') == -1 and (x.find('2009') != -1 or x.find('2010') != -1)])
@@ -100,14 +100,19 @@ def doTraining(config):
     net_type = config[ProjTrainingParams.network_type]
     if net_type == NetworkTypes.UNET or net_type == NetworkTypes.UNET_MultiStream:
         model = select_2d_model(config, last_activation=None)
+        net_type_str = "UNET"
     if net_type == NetworkTypes.SimpleCNN_2:
         model = simpleCNN(config, nn_type="2d", hid_lay=2, out_lay=2, activation='relu', last_activation=None)
+        net_type_str = "SimpleCNN_2"
     if net_type == NetworkTypes.SimpleCNN_4:
         model = simpleCNN(config, nn_type="2d", hid_lay=4, out_lay=2, activation='relu', last_activation=None)
+        net_type_str = "SimpleCNN_4"
     if net_type == NetworkTypes.SimpleCNN_8:
         model = simpleCNN(config, nn_type="2d", hid_lay=8, out_lay=2, activation='relu', last_activation=None)
+        net_type_str = "SimpleCNN_8"
     if net_type == NetworkTypes.SimpleCNN_16:
         model = simpleCNN(config, nn_type="2d", hid_lay=16, out_lay=2, activation='relu', last_activation=None)
+        net_type_str = "SimpleCNN_16"
 
     plot_model(model, to_file=join(output_folder,F'{model_name}.png'), show_shapes=True)
 
@@ -115,14 +120,22 @@ def doTraining(config):
     file_name_splits = join(split_info_folder, F'{model_name}.txt')
     utilsNN.save_splits(file_name=file_name_splits, train_ids=train_ids, val_ids=val_ids, test_ids=test_ids)
 
-    print("Saving input parameters ...")
+    print("############################ INFO PARAMS ############################")
     file_name_input = join(input_info_folder, F'{model_name}.txt')
-    info_params = DataFrame({'Model': [",".join(fields)],
+    info_params = DataFrame({'Model_input': [",".join(fields)],
                             'Comp': [",".join(fields_comp)],
                             'Obs':[",".join(fields_obs)],
                             'output':[",".join(output_fields)],
-                            'Model_params':F"FilterSize:{config[ModelParams.FILTER_SIZE]}"})
+                            'net_type':[net_type_str],
+                            'batch_norm':[config[ModelParams.BATCH_NORMALIZATION]],
+                            'dropout':[config[ModelParams.DROPOUT]],
+                            'start_num_filters':[config[ModelParams.START_NUM_FILTERS]],
+                            'number_levels':[config[ModelParams.NUMBER_LEVELS]],
+                            'filter_size':[config[ModelParams.FILTER_SIZE]],
+                            'input_size':[config[ModelParams.INPUT_SIZE]],
+                            'output_size':[config[ModelParams.OUTPUT_SIZE]]})
     print(info_params)
+    print("Saving input parameters ...")
     info_params.to_csv(file_name_input, index=None)
 
     print("Compiling model ...")
@@ -156,58 +169,58 @@ def doTraining(config):
                         use_multiprocessing=False,
                         workers=1,
                         # validation_freq=10, # How often to compute the validation loss
-                        epochs=epochs, callbacks=[logger, save_callback, stop_callback])
+                        # epochs=epochs, callbacks=[logger, save_callback, stop_callback])
+                        epochs=1, callbacks=[logger, save_callback, stop_callback])
 
-def multipleRuns(config, orig_name, run_ids, bboxes, network_types, network_names,
+def multipleRuns(config, orig_name, run_id, bboxes, network_types, network_names,
                  perc_ocean, in_fields, obs_in_fields, out_fields, comp_fields):
 
-    for i in run_ids:
-        for j, net_type_id in enumerate(network_types):
-            for c_bbox in bboxes:
-                for c_perc_ocean in perc_ocean:
-                    for c_obs_in in obs_in_fields:
-                        for c_out_fields in out_fields:
-                            for c_comp_fields in comp_fields:
-                                for c_in_fields in in_fields:
-                                    # Set run value
-                                    local_name = orig_name.replace("RUN", F"{(i):04d}")
-                                    # Set output fields
-                                    out_fields_txt = '_'.join(c_out_fields).upper().replace("_","-")
-                                    local_name = local_name.replace("OUTPUT", F"OUT_{out_fields_txt}")
-                                    config[ProjTrainingParams.output_fields] = c_out_fields
-                                    config[ModelParams.OUTPUT_SIZE] = len(config[ProjTrainingParams.output_fields])
-                                    # Set network to use
-                                    local_name = local_name.replace("NETWORK", F"NET_{network_names[j]}")
-                                    config[ProjTrainingParams.network_type] = net_type_id
-                                    config[ProjTrainingParams.network_type] = net_type_id
-                                    # Set inputfields
-                                    local_name = local_name.replace("ININ", F"{'-'.join([x.replace('_','-') for x in c_in_fields])}")
-                                    config[ProjTrainingParams.fields_names] = c_in_fields
-                                    # Set obsinputfields
-                                    local_name = local_name.replace("OBSIN", F"{'-'.join([x.replace('_','-') for x in c_obs_in])}")
-                                    config[ProjTrainingParams.fields_names_obs] = c_obs_in
-                                    # Set comp_fields to use
-                                    config[ProjTrainingParams.fields_names_composite] = c_comp_fields
-                                    # Set bbox to use
-                                    local_name = local_name.replace("ROWS", str(c_bbox[0]))
-                                    local_name = local_name.replace("COLS", str(c_bbox[1]))
-                                    input_size = config[ModelParams.INPUT_SIZE]
-                                    input_size[0] = c_bbox[0]
-                                    input_size[1] = c_bbox[1]
-                                    input_size[2] = len(config[ProjTrainingParams.fields_names]) + len(c_obs_in) + \
-                                                    len(config[ProjTrainingParams.fields_names_var]) + len(config[ProjTrainingParams.fields_names_composite])
-                                    config[ModelParams.INPUT_SIZE] = input_size
-                                    config[ProjTrainingParams.rows] = input_size[0]
-                                    config[ProjTrainingParams.cols] = input_size[1]
-                                    # Set perc ocean
-                                    local_name = local_name.replace("PERCOCEAN", F"PERCOCEAN_{str(c_perc_ocean).replace('.','')}")
-                                    config[ProjTrainingParams.perc_ocean] = c_perc_ocean
+    for j, net_type_id in enumerate(network_types):
+        for c_bbox in bboxes:
+            for c_perc_ocean in perc_ocean:
+                for c_obs_in in obs_in_fields:
+                    for c_out_fields in out_fields:
+                        for c_comp_fields in comp_fields:
+                            for c_in_fields in in_fields:
+                                # Set run value
+                                local_name = orig_name.replace("RUN", F"{(run_id):04d}")
+                                # Set output fields
+                                out_fields_txt = '_'.join(c_out_fields).upper().replace("_","-")
+                                local_name = local_name.replace("OUTPUT", F"OUT_{out_fields_txt}")
+                                config[ProjTrainingParams.output_fields] = c_out_fields
+                                config[ModelParams.OUTPUT_SIZE] = len(config[ProjTrainingParams.output_fields])
+                                # Set network to use
+                                local_name = local_name.replace("NETWORK", F"NET_{network_names[j]}")
+                                config[ProjTrainingParams.network_type] = net_type_id
+                                config[ProjTrainingParams.network_type] = net_type_id
+                                # Set inputfields
+                                local_name = local_name.replace("ININ", F"{'-'.join([x.replace('_','-') for x in c_in_fields])}")
+                                config[ProjTrainingParams.fields_names] = c_in_fields
+                                # Set obsinputfields
+                                local_name = local_name.replace("OBSIN", F"{'-'.join([x.replace('_','-') for x in c_obs_in])}")
+                                config[ProjTrainingParams.fields_names_obs] = c_obs_in
+                                # Set comp_fields to use
+                                config[ProjTrainingParams.fields_names_composite] = c_comp_fields
+                                # Set bbox to use
+                                local_name = local_name.replace("ROWS", str(c_bbox[0]))
+                                local_name = local_name.replace("COLS", str(c_bbox[1]))
+                                input_size = config[ModelParams.INPUT_SIZE]
+                                input_size[0] = c_bbox[0]
+                                input_size[1] = c_bbox[1]
+                                input_size[2] = len(config[ProjTrainingParams.fields_names]) + len(c_obs_in) + \
+                                                len(config[ProjTrainingParams.fields_names_var]) + len(config[ProjTrainingParams.fields_names_composite])
+                                config[ModelParams.INPUT_SIZE] = input_size
+                                config[ProjTrainingParams.rows] = input_size[0]
+                                config[ProjTrainingParams.cols] = input_size[1]
+                                # Set perc ocean
+                                local_name = local_name.replace("PERCOCEAN", F"PERCOCEAN_{str(c_perc_ocean).replace('.','')}")
+                                config[ProjTrainingParams.perc_ocean] = c_perc_ocean
 
-                                    print(F"----------------------{local_name}----------------------")
-                                    config[TrainingParams.config_name] = local_name
-                                    doTraining(config)
-                                    # Reset all tensorflow variables
-                                    tf.keras.backend.clear_session()
+                                print(F"----------------------{local_name}----------------------")
+                                config[TrainingParams.config_name] = local_name
+                                doTraining(config)
+                                # Reset all tensorflow variables
+                                tf.keras.backend.clear_session()
                                     
     
     print("All processes finished for these combination of runs!")
@@ -227,13 +240,18 @@ def get_defaults():
     return bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields
 
 if __name__ == '__main__':
-    # Receive start_i from the command line
-    if len(sys.argv) < 2:
+    # Receive GPU_ID and run_id from the command line
+    if len(sys.argv) < 3:
+        print("Usage: python 3_Train_2D.py <GPU_ID> <run_id> running with default values gpu_id = 0, run_id = 1")
+        gpu_id = 0
         run_id = 1
     else:
-        run_id= int(sys.argv[1])
-    print(F"Run id: {run_id}")
-    run_id = [run_id]
+        gpu_id = int(sys.argv[1])
+        run_id = int(sys.argv[2])
+    print(F"GPU ID: {gpu_id}, Run ID: {run_id}")
+    
+    # Set the GPU to use
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
     
     orig_config = get_training()
 
@@ -254,36 +272,41 @@ if __name__ == '__main__':
     # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
 
     # ========== Testing Types of NN options =================
-    print(" --------------- Testing different NN selections -------------------")
-    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
-    network_names = ["2DUNET", "SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
-    multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    if gpu_id == 0:
+        print(" --------------- Testing different NN selections -------------------")
+        bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+        network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
+        network_names = ["2DUNET", "SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
+        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
     
     # ========== Testing obs input fields =================
-    print(" --------------- Testing different input OBS types -------------------")
-    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    obs_in_fields = [["ssh", "sst"], ["ssh", "ssh_err", "sst", "sst_err"]]
-    multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    if gpu_id == 1:
+        print(" --------------- Testing different input OBS types -------------------")
+        bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+        obs_in_fields = [["ssh", "sst"], ["ssh", "ssh_err", "sst", "sst_err"]]
+        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
     
     # ========== Testing output fields =================
-    print(" --------------- Testing different output fields -------------------")
-    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    output_fields = [["temp"],["srfhgt","temp"]]
-    obs_in_fields = [["ssh", "sst"]]
-    in_fields = [["srfhgt","temp"]]
-    comp_fields = [["diff_ssh","topo","diff_sst"]]
-    multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    if gpu_id == 2:
+        print(" --------------- Testing different output fields -------------------")
+        bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+        output_fields = [["temp"],["srfhgt","temp"]]
+        obs_in_fields = [["ssh", "sst"]]
+        in_fields = [["srfhgt","temp"]]
+        comp_fields = [["diff_ssh","topo","diff_sst"]]
+        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
     
     # ========== Testing perc of oceans =================
-    print(" --------------- Testing different Perc ocean -------------------")
-    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    bboxes = [[160,160]]
-    perc_ocean = [.3, .6, .9]
-    multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    if gpu_id == 3:
+        print(" --------------- Testing different Perc ocean -------------------")
+        bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+        bboxes = [[160,160]]
+        perc_ocean = [.3, .6, .9]
+        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
 
     # ========== Testing BBOX options =================
-    print(" --------------- Testing different bbox selections -------------------")
-    bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    bboxes = [[80,80], [120, 120], [160,160]]
-    multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+    if gpu_id == 0:
+        print(" --------------- Testing different bbox selections -------------------")
+        bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+        bboxes = [[80,80], [120, 120], [160,160]]
+        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)

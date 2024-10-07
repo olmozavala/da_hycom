@@ -4,9 +4,14 @@ from os.path import join, exists
 from datetime import datetime,timedelta
 import os, sys
 import pickle
+import tensorflow as tf
 # Common
-sys.path.append("eoas_pyutils/")
-sys.path.append("eoas_pyutils/hycom_utils/python")
+sys.path.append("/unity/f1/ozavala/CODE/da_hycom/")
+sys.path.append("/unity/f1/ozavala/CODE/da_hycom/eoas_pyutils/")
+sys.path.append("/unity/f1/ozavala/CODE/da_hycom/eoas_pyutils/hycom_utils/python")
+# For testing this file
+from config.MainConfig_2D import get_training
+from config.PreprocConfig import get_preproc_config
 
 from viz_utils.eoa_viz import EOAImageVisualizer
 from io_utils.io_netcdf import read_netcdf, read_netcdf_xr
@@ -30,15 +35,18 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
     rows = config[ProjTrainingParams.rows]
     cols = config[ProjTrainingParams.cols]
 
+
+
     output_folder = '/unity/f1/ozavala/OUTPUTS/DA_HYCOM_TSIS/ALL_INPUT/'
-    gen_name = f"2009_2010_{rows}_{cols}"
     # Check the file doesn't exist
 
-    if exists(join(output_folder, f'X_{gen_name}.pkl')) and exists(join(output_folder, f'Y_{gen_name}.pkl')):
-        print("The files already exist. Loading them....")
-        with open(join(output_folder, f'X_{gen_name}.pkl'), 'rb') as f:
+    gen_file_name = f"2009_2010_{rows}_{cols}_{'_'.join(field_names)}_{'_'.join(obs_field_names)}_{'_'.join(output_fields)}.pkl"
+    print(f"Inside the generator, searching for file: {gen_file_name}")
+    if exists(join(output_folder, f"X_{gen_file_name}")) and exists(join(output_folder, f'Y_{gen_file_name}')):
+        print(f"The input files already exist. Loading them.... (X_{gen_file_name})")
+        with open(join(output_folder, f'X_{gen_file_name}'), 'rb') as f:
             X_all = pickle.load(f)
-        with open(join(output_folder, f'Y_{gen_name}.pkl'), 'rb') as f:
+        with open(join(output_folder, f'Y_{gen_file_name}'), 'rb') as f:
             Y_all = pickle.load(f)
         print("Done!")
     else:
@@ -50,7 +58,8 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
 
         # --------- Reading all file names --------------
         # increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) if x.endswith('.a') if x.find('001_18') == -1])
-        # Reading only 2009 and 2010 (default training)
+
+        # --------- Reading only 2009 and 2010 (default training)
         increment_files = np.array([join(input_folder_increment, x).replace(".a", "") for x in os.listdir(input_folder_increment) 
                                     if x.endswith('.a') and x.find('001_18') == -1 and (x.find('2009') != -1 or x.find('2010') != -1)])
         increment_files.sort()
@@ -162,8 +171,8 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
             print(f"Size of the array in memory: {2*size_gb_all:.6f} GB")
 
         # Save X and Y as two huge pickle files
-        x_file = join(output_folder, f'X_{gen_name}.pkl')
-        y_file = join(output_folder, f'Y_{gen_name}.pkl')
+        x_file = join(output_folder, f'X_{gen_file_name}')
+        y_file = join(output_folder, f'Y_{gen_file_name}')
         with open(x_file, 'wb') as f:
             pickle.dump(X_all, f)
         with open(y_file, 'wb') as f:
@@ -225,5 +234,35 @@ def data_gen_from_raw(config, preproc_config, ids, field_names, obs_field_names,
                 # yield X, Y
                 # yield [np.zeros((1, 384, 520, 24, 8))], [np.zeros((1, 384, 520, 24, 6))]
         # except Exception as e:
-            # print(F"----- Not able to generate for file number (from batch):   ERROR: {e}")
+            # print(F"----- Not able to generate for file number ()from batch):   ERROR: {e}"
 
+def get_dataset(config, preproc_config, ids, field_names, obs_field_names, output_fields, z_layers=[0],
+                      examples_per_figure=10, perc_ocean=0, composite_field_names=[], batch_size=1):
+    dataset = tf.data.Dataset.from_generator(data_gen_from_raw, args=[config, preproc_config, ids, field_names, obs_field_names, output_fields, z_layers,
+                      examples_per_figure, perc_ocean, composite_field_names, batch_size],
+                                            output_signature=(
+                                                tf.TensorSpec(shape=(1, 384, 520, 24, 8), dtype=tf.float32),
+                                                tf.TensorSpec(shape=(1, 384, 520, 24, 6), dtype=tf.float32)
+                                            ))
+    return dataset
+
+# Test the dataset
+if __name__ == "__main__":
+    config = get_training()
+    preproc_config = get_preproc_config()
+    ids = np.arange(0, 10)
+    field_names = ["u-vel.", "v-vel.", "temp", "salin", "thknss", "srfhgt", "mix_dpth"]
+    obs_field_names = ["sst", "sst", "ssh_err", "sst_err"]
+    output_fields = ["srfhgt", "temp", "u-vel.", "v-vel.", "salin", "thknss", "srfhgt"]
+    z_layers = [0]
+    examples_per_figure = 10
+    perc_ocean = 0
+    composite_field_names = []
+    batch_size = 1
+
+    dataset = get_dataset(config, preproc_config, ids, field_names, obs_field_names, output_fields, z_layers,
+                          examples_per_figure, perc_ocean, composite_field_names, batch_size)
+
+    for X, Y in dataset:
+        print(f"X shape: {X.shape}, Y shape: {Y.shape}")
+        break

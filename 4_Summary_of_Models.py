@@ -1,3 +1,4 @@
+# %%
 import os
 from os.path import join
 import matplotlib.pyplot as plt
@@ -201,3 +202,5 @@ if __name__ == '__main__':
     c_summary = c_summary[c_summary["BBOX"] == def_bbox]  # Only 160x160
     makeScatter(c_summary, OUT, "Ouptut type", "By_Output_Scatter.png")
     print("Done!")
+
+# %%

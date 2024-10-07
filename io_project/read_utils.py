@@ -1,3 +1,4 @@
+from hycom.io import read_hycom_coords
 from io_utils.dates_utils import get_days_from_month
 from constants_proj.AI_proj_params import PreprocParams
 import pandas as pd
@@ -280,6 +281,21 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
     end_col = start_col + cols
     id_field = 0 # Id of the input fields
 
+    coords_file = "/unity/g1/abozec/TSIS/GOMb0.04/topo/regional.grid.a"
+    # coord_fields = [ 'plon','plat','qlon','qlat','ulon','ulat','vlon','vlat']
+    coord_fields = ['plon','plat']
+
+    hycom_coords = read_hycom_coords(coords_file, coord_fields)
+    lats = hycom_coords['plat'][:,0]
+    lons = hycom_coords['plon'][0,:]
+
+    # Normalize the coordinates to be between 0 and 1
+    lats = (lats - np.min(lats)) / (np.max(lats) - np.min(lats))
+    lons = (lons - np.min(lons)) / (np.max(lons) - np.min(lons))
+
+    lats = lats[start_row:end_row, start_col:end_col]
+    lons = lons[start_row:end_row, start_col:end_col]
+
     # ******* Ad![](../../../../../../../../../../data/HYCOM/DA_HYCOM_TSIS/Training/training_imgs/293_5_0_out.png)ding the model fields for input ********
     ssh_bias = 0
     for c_field in field_names:
@@ -342,12 +358,14 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
         id_field += 1
 
     # ******* Adding the variance fields for input ********
-    for c_field in var_field_names:
-        input_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_obs,
+    if len(var_field_names) > 0:
+        print("Adding variance fields...")
+        for c_field in var_field_names:
+            input_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_obs,
                                                    norm_type=norm_type, normalize=True)
-        # temp_data = input_fields_var[c_field][0, start_row:end_row, start_col:end_col]
-        input_data[:, :, id_field] = temp_data
-        id_field += 1
+            # temp_data = input_fields_var[c_field][0, start_row:end_row, start_col:end_col]
+            input_data[:, :, id_field] = temp_data
+            id_field += 1
 
     # ******************* Filling the 'output' data ***************
     id_field = 0
@@ -373,8 +391,10 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
         #                             file_name=F"delete")
         id_field += 1
 
+    # Add the coordinates to the input data
+    input_data = np.dstack((input_data, lats, lons))
+
     return input_data, y_data
-    # return input_data, input_data
 
 def generateXandY3D(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
                   field_names, obs_field_names, var_field_names, output_fields,
