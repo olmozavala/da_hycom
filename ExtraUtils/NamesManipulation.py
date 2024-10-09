@@ -83,3 +83,9 @@ def landperc(name):
     if "no_land" in name.lower():
         return "No Land"
     return "Unknown"
+
+def getAllInputFields(name):
+    sections = name[name.find("NET"):].split("_")
+
+    obs_fields = getObsFieldsTxt(name)
+    return model_fields, obs_fields

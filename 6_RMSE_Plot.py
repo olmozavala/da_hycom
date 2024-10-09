@@ -11,7 +11,7 @@ import numpy as np
 fontsize = 20
 colors = ['pink', 'lightblue', 'lightgreen','lightyellow','lightgrey']
 
-def makeScatter(c_summary, group_field, xlabel, output_file, title_txt="", units=""):
+def makeScatterTest(c_summary, group_field, xlabel, output_file, title_txt="", units=""):
     if c_summary.empty:
         return
 
@@ -68,10 +68,10 @@ def makeScatter(c_summary, group_field, xlabel, output_file, title_txt="", units
     plt.show()
     plt.close()
 
+# imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/Prediction2002_2006/imgs"
 imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/Prediction2002_2006/imgs"
 # imgs_prediction_folder = "/data/HYCOM/DA_HYCOM_TSIS/PredictionPaper/imgs"
-summary_folder = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/"
-# imgs_prediction_folder = "/home/olmozavala/DAN_HYCOM/OUTPUT/Prediction2002_2006/imgs/"
+summary_folder = "/unity/f1/ozavala/OUTPUTS/DA_HYCOM_TSIS/TrainingSkynetPaperReviews/SUMMARY"
 # summary_folder = "/home/olmozavala/DAN_HYCOM/OUTPUT/SUMMARY/"
 summary_file_name = "summary.csv"
 # summary_file_name = "Summary_Only_Best"
@@ -79,8 +79,8 @@ summary_file_name = "summary.csv"
 all_folders = [ name for name in os.listdir(imgs_prediction_folder) if os.path.isdir(os.path.join(imgs_prediction_folder, name)) ]
 all_folders.sort()
 
-For_2002_2006 = False  # Indicates if we are doing it for 2002 and 2006
-generate_scatter_by_model = False # These are the individual scatter plots for each model
+For_2002_2006 = True # Indicates if we are doing it for 2002 and 2006
+generate_scatter_by_model = True # These are the individual scatter plots for each model
 
 # Define the summary_file
 summary_file = join(summary_folder,summary_file_name)
@@ -171,8 +171,8 @@ output_folder = "/home/olmozavala/Dropbox/Apps/Overleaf/CNN_DA/EXTRA/imgs"
 c_summary = summary_df[np.logical_and((summary_df[IN] == "ssh").values, (summary_df[OUT] == "SRFHGT").values)]
 c_summary = c_summary[c_summary["BBOX"] == "384x520"]  # Only ifull domain
 c_summary = c_summary[c_summary[PERCOCEAN] <= 0.1]  # Only PercOcean 0.0
-# def makeScatter(c_summary, group_field, xlabel, output_file, title_txt="", units=""):
-makeScatter(c_summary, NET, "Network Architecture", join(output_folder,"By_Network_Type_Scatter_TestSet.png"),
+# def makeScatterTest(c_summary, group_field, xlabel, output_file, title_txt="", units=""):
+makeScatterTest(c_summary, NET, "Network Architecture", join(output_folder,"By_Network_Type_Scatter_TestSet.png"),
             title_txt="Network Architecture",
             units="(meters)")
 # %%
@@ -180,7 +180,7 @@ makeScatter(c_summary, NET, "Network Architecture", join(output_folder,"By_Netwo
 c_summary = summary_df[np.logical_and((summary_df[IN] == "ssh").values, (summary_df[OUT] == "SRFHGT").values)]
 c_summary = c_summary[c_summary[NET] == "2DUNET"]   # Only UNet
 c_summary = c_summary[c_summary[PERCOCEAN] == 0.0]  # Only PercOcean 0.0
-makeScatter(c_summary, "BBOX", "Window Size", join(output_folder,"By_bbox_Type_Scatter_TestSet.png"),
+makeScatterTest(c_summary, "BBOX", "Window Size", join(output_folder,"By_bbox_Type_Scatter_TestSet.png"),
             title_txt="Window Size",
             units="(meters)")
 
@@ -188,18 +188,18 @@ makeScatter(c_summary, "BBOX", "Window Size", join(output_folder,"By_bbox_Type_S
 c_summary = summary_df[np.logical_and((summary_df[IN] == "ssh").values, (summary_df[OUT] == "SRFHGT").values)]
 c_summary = c_summary[c_summary["BBOX"] == "160x160"]  # Only 160x160
 c_summary = c_summary[c_summary[NET] == "2DUNET"]   # Only UNet
-makeScatter(c_summary, PERCOCEAN, "Percentage of Ocean", join(output_folder,"By_PercOcean_Type_Scatter_TestSet.png"), "percentage of ocean", units="(meters)")
+makeScatterTest(c_summary, PERCOCEAN, "Percentage of Ocean", join(output_folder,"By_PercOcean_Type_Scatter_TestSet.png"), "percentage of ocean", units="(meters)")
 
 # ========= Compare Inputs type ======
 c_summary = summary_df[np.logical_and(summary_df[NET] == "2DUNET", (summary_df[OUT] == "SRFHGT").values)]
 c_summary = c_summary[c_summary["BBOX"] == "384x520"]  # Only 160x160
 c_summary = c_summary[c_summary[PERCOCEAN] == 0.0]  # Only PercOcean 0.0
-makeScatter(c_summary, IN, "Input fields", join(output_folder,"By_Input_Type_Scatter_TestSet.png"), "input fields", units="(meters)")
+makeScatterTest(c_summary, IN, "Input fields", join(output_folder,"By_Input_Type_Scatter_TestSet.png"), "input fields", units="(meters)")
 
 # ========= Compare Outputs type ======
 c_summary = summary_df[np.logical_and(summary_df[NET] == "2DUNET", (summary_df[IN] == "ssh-sst").values)]
 c_summary = c_summary[c_summary["BBOX"] == "384x520"]  # Only 160x160
 c_summary = c_summary[c_summary[PERCOCEAN] == 0.0]  # Only PercOcean 0.0
-makeScatter(c_summary, OUT, "Output fields", join(output_folder,"By_Output_Type_Scatter_TestSet.png"), "output fields",
+makeScatterTest(c_summary, OUT, "Output fields", join(output_folder,"By_Output_Type_Scatter_TestSet.png"), "output fields",
             units="(meters and degrees)")
 # %%

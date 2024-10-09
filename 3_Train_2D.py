@@ -33,7 +33,7 @@ from tensorflow.keras.layers import LeakyReLU
 from tensorflow.keras.optimizers import Adam, SGD
 
 
-def doTraining(config):
+def doTraining(config, uselatlon=False):
 
     preproc_config = get_preproc_config()
     input_folder_increment =    preproc_config[PreprocParams.input_folder_tsis]
@@ -133,6 +133,7 @@ def doTraining(config):
                             'number_levels':[config[ModelParams.NUMBER_LEVELS]],
                             'filter_size':[config[ModelParams.FILTER_SIZE]],
                             'input_size':[config[ModelParams.INPUT_SIZE]],
+                            'perc_ocean':[config[ProjTrainingParams.perc_ocean]],
                             'output_size':[config[ModelParams.OUTPUT_SIZE]]})
     print(info_params)
     print("Saving input parameters ...")
@@ -151,17 +152,17 @@ def doTraining(config):
 
     print("Training ...")
     # # ----------- Using preprocessed data -------------------
-    examples_per_figure = config[TrainingParams.batch_size]
+    examples_per_figure = 32
     perc_ocean = config[ProjTrainingParams.perc_ocean]
     batch_size_train = config[TrainingParams.batch_size]
-    batch_size_val = 20 # The validation batch size is fixed to 20
+    batch_size_val = 16 # The validation batch size is fixed to 20
 
     generator_train = data_gen_from_raw(config, preproc_config, train_ids, fields, fields_obs, output_fields,
                                         examples_per_figure=examples_per_figure, perc_ocean=perc_ocean, 
-                                        composite_field_names=fields_comp, batch_size=batch_size_train)
+                                        composite_field_names=fields_comp, batch_size=batch_size_train, uselatlon=uselatlon)
     generator_val = data_gen_from_raw(config, preproc_config, val_ids, fields, fields_obs, output_fields,
                                       examples_per_figure=1, perc_ocean=0, composite_field_names=fields_comp,
-                                      batch_size=batch_size_val)
+                                      batch_size=batch_size_val, uselatlon=uselatlon)
 
     model.fit(generator_train, steps_per_epoch=len(train_ids)//batch_size_train,
                         validation_data=generator_val,
@@ -169,11 +170,11 @@ def doTraining(config):
                         use_multiprocessing=False,
                         workers=1,
                         # validation_freq=10, # How often to compute the validation loss
-                        # epochs=epochs, callbacks=[logger, save_callback, stop_callback])
-                        epochs=1, callbacks=[logger, save_callback, stop_callback])
+                        epochs=epochs, callbacks=[logger, save_callback, stop_callback])
+                        # epochs=1, callbacks=[logger, save_callback, stop_callback])
 
 def multipleRuns(config, orig_name, run_id, bboxes, network_types, network_names,
-                 perc_ocean, in_fields, obs_in_fields, out_fields, comp_fields):
+                 perc_ocean, in_fields, obs_in_fields, out_fields, comp_fields, uselatlon=False):
 
     for j, net_type_id in enumerate(network_types):
         for c_bbox in bboxes:
@@ -207,7 +208,12 @@ def multipleRuns(config, orig_name, run_id, bboxes, network_types, network_names
                                 input_size = config[ModelParams.INPUT_SIZE]
                                 input_size[0] = c_bbox[0]
                                 input_size[1] = c_bbox[1]
-                                input_size[2] = len(config[ProjTrainingParams.fields_names]) + len(c_obs_in) + \
+                                # The +2 is for the latitude and longitude fields
+                                if uselatlon:
+                                    input_size[2] = len(config[ProjTrainingParams.fields_names]) + len(c_obs_in) + \
+                                                len(config[ProjTrainingParams.fields_names_var]) + len(config[ProjTrainingParams.fields_names_composite]) + 2
+                                else:
+                                    input_size[2] = len(config[ProjTrainingParams.fields_names]) + len(c_obs_in) + \
                                                 len(config[ProjTrainingParams.fields_names_var]) + len(config[ProjTrainingParams.fields_names_composite])
                                 config[ModelParams.INPUT_SIZE] = input_size
                                 config[ProjTrainingParams.rows] = input_size[0]
@@ -218,7 +224,7 @@ def multipleRuns(config, orig_name, run_id, bboxes, network_types, network_names
 
                                 print(F"----------------------{local_name}----------------------")
                                 config[TrainingParams.config_name] = local_name
-                                doTraining(config)
+                                doTraining(config, uselatlon)
                                 # Reset all tensorflow variables
                                 tf.keras.backend.clear_session()
                                     
@@ -243,17 +249,17 @@ if __name__ == '__main__':
     # Receive GPU_ID and run_id from the command line
     if len(sys.argv) < 3:
         print("Usage: python 3_Train_2D.py <GPU_ID> <run_id> running with default values gpu_id = 0, run_id = 1")
-        gpu_id = 0
-        run_id = 1
+        gpu_id = 1
+        run_id = 0
+        # Secify the GPU to be used by tensorflow
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
     else:
         gpu_id = int(sys.argv[1])
         run_id = int(sys.argv[2])
     print(F"GPU ID: {gpu_id}, Run ID: {run_id}")
     
-    # Set the GPU to use
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-    
     orig_config = get_training()
+    uselatlon = True
 
     # # ====================================================================
     # # ====================== Single training ==========================
@@ -265,48 +271,59 @@ if __name__ == '__main__':
     # # ====================================================================
     orig_name = orig_config[TrainingParams.config_name]
 
-    # ========== NN With best results =================
-    # print(" --------------- Multiple runs of best network -------------------")
-    # bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-    # output_fields = [['srfhgt']]
-    # multipleRuns(orig_config, orig_name, start_i, N, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
-
+    # RERUN
+    # 002 SimpleCNN_16
+    # 001 120x120
+    # 002 ssh-ssh-err-sst-sst-err (input)
+    # 001 SRFHGT-TEMP (output)
+    
+    # ========== Testing BBOX options =================
+    # if gpu_id == 1:
+    if True: # Forcing it to enter here
+        run_id = 4*gpu_id + run_id
+        print(" --------------- Testing different bbox selections -------------------")
+        bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+        # bboxes = [[80,80], [120, 120], [160,160], [384,520]]
+        bboxes = [[384,520]]
+        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields, uselatlon)
+        exit()
     # ========== Testing Types of NN options =================
-    if gpu_id == 0:
+    if gpu_id == 2:
         print(" --------------- Testing different NN selections -------------------")
         bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
         network_types = [NetworkTypes.UNET, NetworkTypes.SimpleCNN_2, NetworkTypes.SimpleCNN_4, NetworkTypes.SimpleCNN_8, NetworkTypes.SimpleCNN_16]
         network_names = ["2DUNET", "SimpleCNN_02", "SimpleCNN_04", "SimpleCNN_08", "SimpleCNN_16"]
-        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields, uselatlon)
     
     # ========== Testing obs input fields =================
-    if gpu_id == 1:
+    if gpu_id == 3:
         print(" --------------- Testing different input OBS types -------------------")
         bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
         obs_in_fields = [["ssh", "sst"], ["ssh", "ssh_err", "sst", "sst_err"]]
-        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields, uselatlon)
+
+    if gpu_id == 3:
+        # ========== NN With best results =================
+        print(" --------------- Multiple runs of best network -------------------")
+        bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
+        output_fields = [['srfhgt']]
+
+        multipleRuns(orig_config, f"best_{orig_name}", run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields, uselatlon)
     
     # ========== Testing output fields =================
-    if gpu_id == 2:
+    if gpu_id == 4:
         print(" --------------- Testing different output fields -------------------")
         bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
         output_fields = [["temp"],["srfhgt","temp"]]
         obs_in_fields = [["ssh", "sst"]]
         in_fields = [["srfhgt","temp"]]
         comp_fields = [["diff_ssh","topo","diff_sst"]]
-        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields, uselatlon)
     
     # ========== Testing perc of oceans =================
-    if gpu_id == 3:
+    if gpu_id == 4:
         print(" --------------- Testing different Perc ocean -------------------")
         bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
         bboxes = [[160,160]]
         perc_ocean = [.3, .6, .9]
-        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
-
-    # ========== Testing BBOX options =================
-    if gpu_id == 0:
-        print(" --------------- Testing different bbox selections -------------------")
-        bboxes, perc_ocean, network_types, network_names, in_fields, obs_in_fields, output_fields, comp_fields = get_defaults()
-        bboxes = [[80,80], [120, 120], [160,160]]
-        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields)
+        multipleRuns(orig_config, orig_name, run_id, bboxes, network_types, network_names, perc_ocean, in_fields, obs_in_fields, output_fields, comp_fields, uselatlon)

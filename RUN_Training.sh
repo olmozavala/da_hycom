@@ -2,7 +2,7 @@
 
 # Define the number of GPUs available
 NUM_GPUS=4
-MAX_RUN_ID=5
+MAX_RUN_ID=8
 
 # Define the script or command to run for training
 TRAINING_SCRIPT="/conda/ozavala/miniconda/envs/aieoas/bin/python /unity/f1/ozavala/CODE/da_hycom/3_Train_2D.py"

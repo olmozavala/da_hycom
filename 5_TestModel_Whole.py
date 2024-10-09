@@ -34,6 +34,7 @@ from viz_utils.eoa_viz import select_colormap
 
 from hycom.io import read_hycom_fields, read_hycom_coords, read_field_names
 
+
 def test_model(config, years):
     input_folder = config[PredictionParams.input_folder]
     output_folder = config[PredictionParams.output_folder]
@@ -120,26 +121,31 @@ def test_model(config, years):
     tot_rows = 384
     tot_cols = 525
 
-    start_test_idx = 576+73
-
-    coords_file = "/nexsan/people/abozec/TSIS/GOMb0.04/topo/regional.grid.a"
+    coords_file = "/unity/g1/abozec/TSIS/GOMb0.04/topo/regional.grid.a"
     print(F"The coords available are: {read_field_names(coords_file)}")
     coords = read_hycom_coords(coords_file, ['plon:', 'plat:'])
     lons = coords['plon']
     lats = coords['plat']
     print("Done!")
 
-    # Only doing it for the TEST dataset
-    # for id_file, c_file in enumerate(increment_files[start_test_idx:]):
-
-    # All files
     test_files = [x for x in increment_files if any(x.find(str(y)) != -1 for y in years)]
+
+    # If one of the years is 2002, then we start from the 576 index, if not from 0
+    if 2002 in years:
+        start_test_idx = 0
+    else:
+        start_test_idx = 576+73
+
+    test_files = test_files[start_test_idx:]
+    # All files
     successful_files = []
     successful_dates = []
 
     # Only to simulate multiple z-layers as a batch
-    sim_z_layers = 41
-    new_x = np.zeros((sim_z_layers, 384, 520, 7), dtype=np.float16)
+    # sim_z_layers = 41
+    # new_x = np.zeros((sim_z_layers, 384, 520, 7), dtype=np.float16)
+
+
 
     for id_file, c_file in enumerate(test_files):
         # Find current and next date
@@ -204,29 +210,32 @@ def test_model(config, years):
 
                 #=====================  Make the prediction of the network =======================
                 # --------------- DELETE THIS JUST FOR TESTING TIME TO PREDICT ALL THE 30 LEVELS----------------
-                for i in range(sim_z_layers):
-                    new_x[i,:,:,:] = X
+                # for i in range(sim_z_layers):
+                #     new_x[i,:,:,:] = X
 
-                tensor = tf.convert_to_tensor(new_x)
-                # Place the tensor on the GPU
-                with tf.device('/GPU:0'):
-                    gpu_tensor = tf.identity(tensor)
+                # tensor = tf.convert_to_tensor(new_x)
+                # # Place the tensor on the GPU
+                # with tf.device('/GPU:0'):
+                #     gpu_tensor = tf.identity(tensor)
 
-                start = time.time()
-                output_nn_original_multiple = model.predict(gpu_tensor)
-                toc = time.time() - start
-                # Print current time: 
-                print(F"Time to predict all the {sim_z_layers} levels: {toc:0.4f} seconds")
-
-                this_file_times.append(toc)
-
-                if id_file == 0:  # REMOVE THIS IF FOR NORMAL RUN
-                    output_nn_original = model.predict(X)
-                # --------------- DELETE THIS JUST FOR TESTING TIME TO PREDICT ALL THE 30 LEVELS----------------
                 # start = time.time()
-                # output_nn_original = model.predict(X)
+                # output_nn_original_multiple = model.predict(gpu_tensor)
                 # toc = time.time() - start
+                # # Print current time: 
+                # print(F"Time to predict all the {sim_z_layers} levels: {toc:0.4f} seconds")
+
                 # this_file_times.append(toc)
+
+                # if id_file == 0:  # REMOVE THIS IF FOR NORMAL RUN
+                #     output_nn_original = model.predict(X)
+                # --------------- DELETE THIS JUST FOR TESTING TIME TO PREDICT ALL THE 30 LEVELS----------------
+
+                # --------------- Normal prediction ---------------
+                start = time.time()
+                output_nn_original = model.predict(X)
+                toc = time.time() - start
+                this_file_times.append(toc)
+                # --------------- Normal prediction ---------------
 
                 # Make nan all values inside the land
                 land_indexes = Y == -0.5
@@ -258,8 +267,7 @@ def test_model(config, years):
         all_whole_mean_times.append(np.mean(np.array(this_file_times)))
         all_whole_sum_times.append(np.sum(np.array(this_file_times)))
 
-        # if day_of_year % 300 == 0: # Plot 10% of the times
-        if False:
+        if id_file % 10 == 0: # Plot 10% of the times
             all_cmin = cminmax_model[0]+cminmax_comp[0]+cminmax_obs[0]+cminmax_std[0]+cminmax_out[0]+cminmax_out[0]+cminmax_error[0]
             all_cmax = cminmax_model[1]+cminmax_comp[1]+cminmax_obs[1]+cminmax_std[1]+cminmax_out[1]+cminmax_out[1]+cminmax_error[1]
 
@@ -451,8 +459,10 @@ def verifyBoundaries(start_col, cols, tot_cols):
 
 if __name__ == '__main__':
 
+    os.environ["CUDA_VISIBLE_DEVICES"] = "3"
     config = get_prediction_params()
-    years = [2010]  # Which years to evaluate the model
+    years = [2009, 2010]  # Which years to evaluate the model
+    # years = [2002, 2006]  # Which years to evaluate the model
     # -------- For single model testing (not easy to test because everything must be defined in MainConfig_2D.py)--------------
     # print("Testing single model....")
     # test_model(config)
@@ -460,7 +470,8 @@ if __name__ == '__main__':
     # -------- For all summary model testing --------------
     print("Testing all the models inside summary.csv ....")
     # summary_file = "/data/HYCOM/DA_HYCOM_TSIS/SUMMARY/Summary_Only_Best.csv"
-    summary_file = "/unity/f1/ozavala/DATA/NN_HYCOM_TSIS/SUMMARY/Summary_Only_Best.csv"
+    # summary_file = "/unity/f1/ozavala/DATA/NN_HYCOM_TSIS/SUMMARY/Summary_Only_Best.csv"
+    summary_file = "/unity/f1/ozavala/OUTPUTS/DA_HYCOM_TSIS/TrainingSkynetPaperReviews/SUMMARY/summary.csv"
     df = pd.read_csv(summary_file)
 
     for model_id in range(len(df)):
@@ -476,7 +487,8 @@ if __name__ == '__main__':
         input_file = join(inputs_path, listdir(inputs_path)[0]) # This should give you the file name with the inputs
         in_df = pd.read_csv(input_file)
         # Setting model vars
-        model_fields = in_df["Model"].item().split(',')
+        # model_fields = in_df["Model"].item().split(',')  # It got modified at some point
+        model_fields = in_df["Model_input"].item().split(',')
         config[ProjTrainingParams.fields_names] = model_fields
         # Setting obs vars
         obs_fields = in_df["Obs"].item().split(',')
@@ -490,14 +502,15 @@ if __name__ == '__main__':
         config[ModelParams.OUTPUT_SIZE] = len(config[ProjTrainingParams.output_fields])
         print(F"Input fields: {model_fields}, {obs_fields}, {comp_fields}  Output fields: {output_fields}")
         # Model parameters
-        filter_size = int(in_df["Model_params"].item().split(':')[1])
+        # filter_size = int(in_df["Model_params"].item().split(':')[1]) # It also got modified at some point
+        filter_size = int(in_df["filter_size"])
         config[ModelParams.FILTER_SIZE] = filter_size
 
         # Setting BBOX
         grows, gcols, bboxtxt = getBBOXandText(name)
         config[ModelParams.INPUT_SIZE][0] = grows
         config[ModelParams.INPUT_SIZE][1] = gcols
-        config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(comp_fields)
+        config[ModelParams.INPUT_SIZE][2] = len(model_fields) + len(obs_fields) + len(comp_fields) + 2 # +2 for lat and lon
         config[ProjTrainingParams.rows] = grows
         config[ProjTrainingParams.cols] = gcols
         # Setting model weights file

@@ -18,13 +18,15 @@ import cmocean.cm as cm
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 
+output_folder = "/unity/f1/ozavala/OUTPUTS/DA_HYCOM_TSIS/TrainingSkynetPaperReviews/PaperPlots/"
 # %% ================== Plot Gom Domain Oringal==============
 bbox = [-98, -77.04, 18.091648, 31.960648]
+
+coords_file = "TSIS/GOMb0.04/topo/regional.grid.a"
 def gomdomain():
-    output_folder = "/home/olmozavala/Dropbox/MyProjects/EOAS/COAPS/MURI_AI_Ocean/Data_Assimilation/HYCOM-TSIS/ImagesForPresentation/"
-    model_file = "/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/incup/incupd.2010_003_18"
+    model_file = "/unity/g1/abozec/TSIS/GOMb0.04/expt_02.2/incup/incupd.2010_003_18"
     hycom_fields = read_hycom_fields(model_file, ['temp','srfhgt'], [0])
-    grid = xr.load_dataset("/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/topo/gridinfo.nc")
+    grid = xr.load_dataset("/unity/g1/abozec/TSIS/GOMb0.04/topo/gridinfo.nc")
     hycom_fields['temp'][np.isnan(hycom_fields['srfhgt'])] = np.nan
 
     lats = grid.mplat[:,0]
@@ -44,7 +46,8 @@ def gomdomain():
 gomdomain()
 
 # %% ================== Plot Gom Domain Bathymetry==============
-bat_file = "/home/olmozavala/Dropbox/TestData/netCDF/Bathymetry/w100n40.nc"
+# bat_file = "/home/olmozavala/Dropbox/TestData/netCDF/Bathymetry/w100n40.nc"
+bat_file = "/unity/f1/ozavala/common_data/bathymetry/w100n40.nc"
 bat_data = xr.load_dataset(bat_file)
 # Crop to bbox
 bat_data = bat_data.sel(x=slice(bbox[0], bbox[1]), y=slice(bbox[2], bbox[3]))
@@ -78,9 +81,9 @@ gl.ylabel_style = {'size': 18, 'color': 'black'}  # Customize font size and colo
 plt.tight_layout()
 
 # Save the plot without extra white space
-plt.savefig('/home/olmozavala/Dropbox/Apps/Overleaf/CNN_DA/images/f01.png', bbox_inches='tight', pad_inches=.1)
-
+plt.savefig(join(output_folder, 'f01.png'), bbox_inches='tight', pad_inches=.1)
 plt.show()
+
 # %% ================= Similar plot but with random boxes of size 384x520
 
 for desired_size in [0, 160, 120, 80]:
@@ -91,9 +94,9 @@ for desired_size in [0, 160, 120, 80]:
     bbox = [-98, -77.04, 18.09, 31.96]
     ax.set_extent(bbox)
 
-    model_file = "/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/expt_02.2/incup/incupd.2010_003_18"
+    model_file = "/unity/g1/abozec/TSIS/GOMb0.04/expt_02.2/incup/incupd.2010_003_18"
     hycom_fields = read_hycom_fields(model_file, ['temp','srfhgt'], [0])
-    grid = xr.load_dataset("/data/COAPS_nexsan/people/abozec/TSIS/GOMb0.04/topo/gridinfo.nc")
+    grid = xr.load_dataset("/unity/g1/abozec/TSIS/GOMb0.04/topo/gridinfo.nc")
     hycom_fields['temp'][np.isnan(hycom_fields['srfhgt'])] = np.nan
 
     # Plot temperature using contourf
@@ -145,7 +148,7 @@ for desired_size in [0, 160, 120, 80]:
     plt.tight_layout()
 
     # Save the plot without extra white space
-    plt.savefig(f'/home/olmozavala/Dropbox/Apps/Overleaf/CNN_DA/images/f03_{desired_size}.png', bbox_inches='tight', pad_inches=.1)
+    plt.savefig(join(output_folder, f'f03_{desired_size}.png'), bbox_inches='tight', pad_inches=.1)
 
     plt.show()
 
@@ -289,3 +292,150 @@ plt.savefig('/home/olmozavala/Dropbox/MyConferencesAndWorkshops/2022/OceanScienc
 plt.show()
 plt.close()
 print("Done!")
+
+# %% Input and output plot
+# Reading the data
+import pickle
+from os.path import join
+
+pkl_folder = "/unity/f1/ozavala/OUTPUTS/DA_HYCOM_TSIS/ALL_INPUT/"
+pkl_file = "2009_2010_384_520_IN_srfhgt_temp_OBS_ssh_ssh_err_sst_sst_err_OUT_srfhgt_temp_PERC_0.pkl"
+
+X = pickle.load(open(join(pkl_folder, f"X_{pkl_file}"), 'rb'))
+Y = pickle.load(open(join(pkl_folder, f"Y_{pkl_file}"), 'rb'))
+
+print(X[0].shape)
+print(Y[0].shape)
+
+# %%
+# Plotting the data with maptlotlib and cartopy, using cmocean colormaps
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import cmocean.cm as cm
+import sys
+sys.path.append("eoas_pyutils")
+sys.path.append('eoas_pyutils/hycom_utils/python')
+from hycom.io import read_hycom_coords
+import numpy as np
+from scipy.ndimage import gaussian_filter
+
+coords_file = "/unity/g1/abozed/TSIS/GOMb0.04/topo/regional.grid.a"
+# coord_fields = [ 'plon','plat','qlon','qlat','ulon','ulat','vlon','vlat']
+coord_fields = ['plon','plat']
+
+hycom_coords = read_hycom_coords(coords_file, coord_fields)
+lats = hycom_coords['plat'][:,0]
+lons = hycom_coords['plon'][0,:]
+
+print(f"lats shape: {lats.shape}, lons shape: {lons.shape}")
+lats = lats[1:385]
+lons = lons[5:525]
+
+# %%
+def smooth_field(field, sigma):
+    smooth_field = gaussian_filter(field, sigma=sigma)
+    smooth_field = np.where(np.abs(smooth_field) < 0.0001, np.nan, smooth_field)
+    return smooth_field
+
+bbox = [np.min(lons), np.max(lons), np.min(lats), np.max(lats)]
+
+for idx in range(3,4):
+    inputs = X[idx][0,:,:,:]
+    outputs = Y[idx][0,:,:,:]
+
+    # Bathymetry
+    bat_file = "/unity/f1/ozavala/common_data/bathymetry/w100n40.nc"
+    bat_data = xr.load_dataset(bat_file)
+    bat_data = bat_data.sel(x=slice(bbox[0], bbox[1]), y=slice(bbox[2], bbox[3]))
+    # Plot iso-contours of bathymetry data
+    # contour_levels = np.linspace(-5000, 0, 100)  # Adjust range and number of levels as needed
+    contour_levels = [-5000, -2000, -1000, -500, -200, -100, -5]
+
+    # Inputs background fields
+    back_ssh = np.where(inputs[:,:,0] == 0, np.nan, inputs[:,:,0])
+    back_sst= np.where(inputs[:,:,1] == 0, np.nan, inputs[:,:,1])
+
+    # Inputs observations
+    adt_obs = smooth_field(inputs[:,:,5], 1)
+    adt_obs_err = smooth_field(inputs[:,:,6],2)
+    adt_obs_err = np.where(adt_obs_err <= .001, np.nan, adt_obs_err)
+    # adt_obs_err = smooth_field(inputs[:,:,6],2)
+    sst_obs = np.where(inputs[:,:,7] == 0, np.nan, inputs[:,:,7])
+    sst_obs_err = np.where(inputs[:,:,8] == 0, np.nan, inputs[:,:,8])
+
+    # CORRECT -> 0(x_ssh), 1(x_sst), 2(ssh_diff), 3(sst_diff), 4(topo), 5(ssh_obs), 6(ssh_err), 7(sst_obs), 8(sst_err)
+
+    # Inputs observations-background field
+    adt_diff = smooth_field(inputs[:,:,2], 2)
+    sst_diff = np.where(inputs[:,:,3] == 0, np.nan, inputs[:,:,3])
+
+    # Additional fields
+    topo_mask = np.where(inputs[:,:,4] == 0, np.nan, inputs[:,:,4])
+    input_lats = np.where(inputs[:,:,9] == 0, np.nan, inputs[:,:,9])
+    input_lons = np.where(inputs[:,:,10] == 0, np.nan, inputs[:,:,10])
+
+    proj = ccrs.PlateCarree()
+    def plot_ax(ax, field, title, cmap=cm.thermal, vmin=None, vmax=None, display_contour=False):
+        if display_contour:
+            ct = ax.contourf(bat_data.x, bat_data.y, bat_data.z, levels=contour_levels, cmap=cm.deep, alpha=0.1)
+        if vmin is None:
+            vmin = np.nanmin(field)
+        if vmax is None:
+            vmax = np.nanmax(field)
+        im = ax.imshow(np.flipud(field), cmap=cmap, vmin=vmin, vmax=vmax, extent=bbox, transform=proj)
+        ax.set_title(title, fontsize=16)
+        # Add gridlines
+        gl = ax.gridlines(draw_labels=True, color='grey', alpha=0.3, linestyle='--')
+        gl.top_labels = False
+        gl.right_labels = False
+        # Colorbar with fraction of the plot
+        # plt.colorbar(im, location='right', shrink=.80, pad=.03)
+
+        #  Add land on top of the image
+        ax.add_feature(cfeature.LAND, facecolor='gray')
+
+    fig_zoom = 1.5
+    fig, ax = plt.subplots(3,4, figsize=(int(16*fig_zoom),int(8*fig_zoom)), subplot_kw={'projection': proj})
+
+    plot_ax(ax[0,0], adt_obs, "ADT Observations", cmap=cm.delta, display_contour=True)
+    plot_ax(ax[0,1], adt_obs_err, "ADT Observations error", cmap=cm.thermal, display_contour=True)
+    plot_ax(ax[0,2], sst_obs, "SST Observations", cmap=cm.thermal, vmin=-2, vmax=2)
+    plot_ax(ax[0,3], sst_obs_err, "SST Observations error", cmap=cm.thermal, vmin=-2, vmax=2)
+
+    plot_ax(ax[1,0], back_ssh, "Background SSH field", cmap=cm.delta)   # Using suggested cmocan for SSH
+    plot_ax(ax[1,1], back_sst, "Background SST field", cmap=cm.thermal)
+    plot_ax(ax[1,2], adt_diff, "ADT diff", cmap=cm.delta, display_contour=True)
+    plot_ax(ax[1,3], sst_diff, "SST diff", cmap=cm.thermal)
+
+    # Extra fields
+    plot_ax(ax[2,0], topo_mask, "Topography mask", cmap=cm.delta, display_contour=True)
+    plot_ax(ax[2,1], input_lats, "Input latitudes", cmap=cm.thermal, display_contour=True)
+    plot_ax(ax[2,2], input_lons, "Input longitudes", cmap=cm.thermal, display_contour=True)
+    # Remove axes for the rest of the plots in the row
+    for i in range(2,4):
+        ax[2,i].axis('off')
+    
+    # Title
+    # fig.suptitle("Example of all inputs used for the ML models", fontsize=16)
+    plt.savefig(join(output_folder, f"Example_{idx}.png" ), bbox_inches='tight')
+    plt.show()
+    plt.close()
+    print("Done!")
+
+    # Outputs
+    ssh_output = np.where(outputs[:,:,0] == 0, np.nan, outputs[:,:,0])
+    sst_output= np.where(outputs[:,:,1] == 0, np.nan, outputs[:,:,1])
+
+    fig_zoom = 1.3
+    fig, ax = plt.subplots(1,2, figsize=(int(17*fig_zoom),int(6*fig_zoom)), subplot_kw={'projection': proj})
+
+    plot_ax(ax[0], ssh_output, "SSH increment", cmap=cm.delta, display_contour=True)
+    plot_ax(ax[1], sst_output, "SST increment", cmap=cm.thermal)
+    
+    # Title
+    # fig.suptitle("Example of desired outputs used for the ML models", fontsize=16)
+    plt.savefig(join(output_folder, f"Example_outputs_{idx}.png" ), bbox_inches='tight', pad_inches=.1)
+    plt.show()
+    plt.close()
+    print("Done!")

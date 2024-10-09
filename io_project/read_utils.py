@@ -1,3 +1,4 @@
+
 from hycom.io import read_hycom_coords
 from io_utils.dates_utils import get_days_from_month
 from constants_proj.AI_proj_params import PreprocParams
@@ -257,7 +258,7 @@ def generateXandYMulti(input_fields_model, input_fields_obs, input_fields_var, o
 
 def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, output_field_increment,
                     field_names, obs_field_names, var_field_names, output_fields,
-                    start_row, start_col, rows, cols, norm_type = PreprocParams.mean_var, perc_ocean = 1.0):
+                    start_row, start_col, rows, cols, norm_type = PreprocParams.mean_var, perc_ocean = 1.0, uselatlon=False):
     """
     This function will generate X and Y boxes depening on the required field names and bboxes
     :param input_fields_model:
@@ -293,8 +294,14 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
     lats = (lats - np.min(lats)) / (np.max(lats) - np.min(lats))
     lons = (lons - np.min(lons)) / (np.max(lons) - np.min(lons))
 
-    lats = lats[start_row:end_row, start_col:end_col]
-    lons = lons[start_row:end_row, start_col:end_col]
+    lats = lats[start_row:end_row]
+    lons = lons[start_col:end_col]
+
+    # Make MESHGRID of the coordinates
+    lats_mesh, lons_mesh = np.meshgrid(lats, lons)
+    # Roll the latitude and longitude to be in the shape of the input data
+    lats_mesh = np.rollaxis(lats_mesh, 0, 2)
+    lons_mesh = np.rollaxis(lons_mesh, 0, 2)
 
     # ******* Ad![](../../../../../../../../../../data/HYCOM/DA_HYCOM_TSIS/Training/training_imgs/293_5_0_out.png)ding the model fields for input ********
     ssh_bias = 0
@@ -384,15 +391,11 @@ def generateXandY2D(input_fields_model, input_fields_obs, input_fields_var, outp
         temp_data[c_mask] = np.nan
         y_data[:, :, id_field] = normalizeData(temp_data, c_field, data_type=PreprocParams.type_inc,
                                                    norm_type=norm_type, normalize=True)
-        # y_data[:, :, id_field] = temp_data
-        # viz_obj = EOAImageVisualizer(output_folder=join(input_folder_preproc, "training_imgs"), disp_images=True)
-        # viz_obj.plot_2d_data_np_raw(y_data.swapaxes(0,2),
-        #                             var_names= [F"out_inc_{x}" for x in output_fields],
-        #                             file_name=F"delete")
         id_field += 1
 
     # Add the coordinates to the input data
-    input_data = np.dstack((input_data, lats, lons))
+    if uselatlon:
+        input_data = np.dstack((input_data, lats_mesh, lons_mesh))
 
     return input_data, y_data
 
